@@ -31,7 +31,8 @@
 (defstruct (demo-handle (:conc-name dh-))
   (control-command-subscriber nil)
   (control-command nil)
-  (control-command-watcher nil))
+  (control-command-watcher nil)
+  (control-command-publisher nil))
 
 ;;;
 ;;; Helper functions
@@ -49,17 +50,26 @@
      :control-command cc-fluent
      :control-command-watcher (cpl:fl-value-changed
                                *control-command*
-                               :test #'string=))))
+                               :test #'string=)
+     :control-command-publisher (roslisp:advertise "/demo_command"
+                                                   "std_msgs/String"
+                                                   :latch t))))
 
 (defun destroy-demo-handle (demo-handle)
-  (roslisp:unsubscribe (dh-control-command-subscriber demo-handle)))
+  (roslisp:unsubscribe (dh-control-command-subscriber demo-handle))
+  (roslisp:unadvertise "/demo_command"))
 
-(defmacro with-process-modules (&body body)
+(defmacro with-process-modules-pr2 (&body body)
   `(cpm:with-process-modules-running
        (pr2-manipulation-process-module:pr2-manipulation-process-module
         pr2-navigation-process-module:pr2-navigation-process-module
         point-head-process-module:point-head-process-module
         robosherlock-process-module:robosherlock-process-module)
+     ,@body))
+
+(defmacro with-process-modules-boxy (&body body)
+  `(cpm:with-process-modules-running
+       ()
      ,@body))
 
 (defmacro try-n-times (n &body body)
@@ -227,7 +237,6 @@
     (robosherlock-pm::ignore-bullet-object 'cram-pr2-knowledge::pr2)))
 
 (defun prepare-settings ()
-  (setf *wait-for-trigger* nil)
   (setf location-costmap::*fixed-frame* "/map")
   ;; NOTE(winkler): This validator breaks IK based `to reach' and `to
   ;; see' location resolution. Disabling it, since everything works
@@ -273,9 +282,14 @@
 (defun wait-for-control-continue (demo-handle)
   (wait-for-control-command demo-handle "continue"))
 
+(defun send-control-command (demo-handle command)
+  (roslisp:publish (dh-control-command-publisher demo-handle)
+                   (make-message "std_msgs/String" :data command)))
+
 (defun test-demo-handle ()
   (let ((dh (get-demo-handle)))
-    (wait-for-control-continue dh)
+    (send-control-command dh "test")
+    ;(wait-for-control-continue dh)
     (destroy-demo-handle dh)))
 
 ;;;
