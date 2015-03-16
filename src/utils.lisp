@@ -121,6 +121,117 @@
                                `((desig-props:grasp-type ,grasp-type)))))
         collect handle-object))))
 
+(defmethod init-ms-belief-state (&key debug-window objects)
+  (ros-info (bullet) "Clearing bullet world")
+  (crs:prolog `(btr:clear-bullet-world))
+  (let* ((test-0 (ros-info (bullet) "Gathering data"))
+         (robot-pose (get-robot-pose))
+         (test-01 (ros-info (bullet) "Robot pose OK"))
+         (urdf-robot
+           (cl-urdf:parse-urdf
+            (roslisp:get-param "robot_description_lowres")))
+         (test-02 (ros-info (bullet) "Robot description OK"))
+         (urdf-kitchen
+           (cl-urdf:parse-urdf
+            (roslisp:get-param "kitchen_description")))
+         (test-03 (ros-info (bullet) "Kitchen description OK"))
+         (scene-rot-quaternion (tf:euler->quaternion :az pi))
+         (scene-rot `(,(tf:x scene-rot-quaternion)
+                      ,(tf:y scene-rot-quaternion)
+                      ,(tf:z scene-rot-quaternion)
+                      ,(tf:w scene-rot-quaternion)))
+         (scene-trans `(-3.45 -4.35 0))
+         (robot-pose robot-pose)
+         (robot-rot `(,(tf:x (tf:orientation robot-pose))
+                      ,(tf:y (tf:orientation robot-pose))
+                      ,(tf:z (tf:orientation robot-pose))
+                      ,(tf:w (tf:orientation robot-pose))))
+         (robot-trans `(,(tf:x (tf:origin robot-pose))
+                        ,(tf:y (tf:origin robot-pose))
+                        ,(tf:z (tf:origin robot-pose))))
+         (test-1 (ros-info (bullet) "Asserting scene"))
+         (bdgs
+           (car
+            (force-ll
+             (crs:prolog
+              `(and (btr:clear-bullet-world)
+                    (btr:bullet-world ?w)
+                    (btr:assert (btr:object
+                                 ?w btr:static-plane floor
+                                 ((0 0 0) (0 0 0 1))
+                                 :normal (0 0 1) :constant 0))
+                    ,@(when debug-window
+                       `((btr:debug-window ?w)))
+                    (btr:robot ?robot)
+                    ,@(loop for object in objects
+                            for obj-name = (car object)
+                            for obj-pose = (cdr object)
+                            collect `(btr:assert
+                                      (btr:object
+                                       ?w btr:box ,obj-name
+                                       ((,(tf:x (tf:origin obj-pose))
+                                         ,(tf:y (tf:origin obj-pose))
+                                         ,(tf:z (tf:origin obj-pose)))
+                                        (,(tf:x (tf:orientation obj-pose))
+                                         ,(tf:y (tf:orientation obj-pose))
+                                         ,(tf:z (tf:orientation obj-pose))
+                                         ,(tf:w (tf:orientation obj-pose))))
+                                       :mass 0.0 :size (0.1 0.1 0.1))))
+                    (assert (btr:object
+                             ?w btr:urdf ?robot
+                             (,robot-trans ,robot-rot)
+                             :urdf ,urdf-robot))
+                    (assert (btr:object
+                             ?w btr:semantic-map sem-map-kitchen
+                             (,scene-trans ,scene-rot)
+                             :urdf ,urdf-kitchen))))))))
+    (declare (ignore test-0 test-01 test-02 test-03 test-1))
+    (ros-info (bullet) "Check binding for robot")
+    (var-value
+     '?pr2
+     (lazy-car
+      (crs:prolog
+       `(and (btr:robot ?robot)
+             (btr:%object ?w ?robot ?pr2)) bdgs)))
+    (ros-info (bullet) "Check binding for kitchen")
+    (var-value
+     '?sem-map
+     (lazy-car
+      (crs:prolog
+       `(btr:%object ?w sem-map-kitchen ?sem-map) bdgs)))
+    (ros-info (bullet) "Done")
+    (robosherlock-pm::ignore-bullet-object 'sem-map-kitchen)
+    (robosherlock-pm::ignore-bullet-object 'common-lisp::floor)
+    (robosherlock-pm::ignore-bullet-object 'cram-pr2-knowledge::pr2)))
+
+(defun prepare-settings ()
+  (setf *wait-for-trigger* nil)
+  (setf location-costmap::*fixed-frame* "/map")
+  ;; NOTE(winkler): This validator breaks IK based `to reach' and `to
+  ;; see' location resolution. Disabling it, since everything works
+  ;; just nicely without it. Gotta look into this later.
+  (cram-designators:disable-location-validation-function
+   'bullet-reasoning-designators::check-ik-solution)
+  ;(cram-designators:disable-location-validation-function
+  ; 'spatial-relations-costmap::potential-field-costmap-pose-function)
+  ;(cram-designators:disable-location-validation-function
+  ; 'spatial-relations-costmap::collision-pose-validator)
+  (cram-designators:disable-location-validation-function
+   'bullet-reasoning-designators::validate-designator-solution)
+  (cram-uima::config-uima)
+  ;; Setting the timeout for action server responses to a high
+  ;; value. Otherwise, the (very long, > 2.0 seconds) motion planning
+  ;; process will just drop the connection and never execute.
+  (setf actionlib::*action-server-timeout* 20)
+  (beliefstate::enable-logging t)
+  (ros-info (longterm) "Init Belief State")
+  (init-ms-belief-state :debug-window t)
+  (setf btr::*bb-comparison-validity-threshold* 0.1)
+  (moveit:clear-collision-environment)
+  ;; Twice, because sometimes a ROS message for an object gets lost.
+  ;(sem-map-coll-env:publish-semantic-map-collision-objects)
+  (sem-map-coll-env:publish-semantic-map-collision-objects))
+
 ;;;
 ;;; Plan Macros
 ;;;
