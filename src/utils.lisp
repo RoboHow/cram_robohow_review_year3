@@ -28,9 +28,31 @@
 
 (in-package :cram-robohow-review-year3)
 
+(defstruct (demo-handle (:conc-name dh-))
+  (control-command-subscriber nil)
+  (control-command nil)
+  (control-command-watcher nil))
+
 ;;;
 ;;; Helper functions
 ;;;
+
+(defun get-demo-handle ()
+  (let ((cc-fluent (cpl:make-fluent :name "control-command"
+                                    :allow-tracing nil)))
+    (make-demo-handle
+     :control-command-subscriber
+     (roslisp:subscribe "/demo_command" "std_msgs/String"
+                        (lambda (msg)
+                          (with-fields (data) msg
+                            (setf (cpl:value cc-fluent) data))))
+     :control-command cc-fluent
+     :control-command-watcher (cpl:fl-value-changed
+                               *control-command*
+                               :test #'string=))))
+
+(defun destroy-demo-handle (demo-handle)
+  (roslisp:unsubscribe (dh-control-command-subscriber demo-handle)))
 
 (defmacro with-process-modules (&body body)
   `(cpm:with-process-modules-running
@@ -232,34 +254,29 @@
   ;(sem-map-coll-env:publish-semantic-map-collision-objects)
   (sem-map-coll-env:publish-semantic-map-collision-objects))
 
-(defvar *demo-control-subscriber* nil)
-(defvar *control-command*
-  (cpl:make-fluent :name "control-command" :allow-tracing nil))
-(defvar *control-command-watcher*
-  (cpl:fl-value-changed *control-command* :test #'string=))
-
 (defun control-command-callback (msg)
   (with-fields (data) msg
     (setf (cpl:value *control-command*) data)))
 
-(defun init-demo-control ()
-  (setf *demo-control-subscriber*
-        (roslisp:subscribe "/demo_command" "std_msgs/String"
-                           #'control-command-callback)))
+(defun get-control-command (demo-handle)
+  (cpl:wait-for (cpl-impl:fl-pulsed
+                 (dh-control-command-watcher demo-handle)))
+  (prog1 (cpl:value *control-command*)
+    (setf
+     (dh-control-command-watcher demo-handle)
+     (cpl:fl-value-changed *control-command* :test #'string=))))
 
-(defun get-control-command ()
-  (cond ((and *demo-control-subscriber* *control-command-watcher*)
-         (cpl:wait-for (cpl-impl:fl-pulsed *control-command-watcher*))
-         (prog1 (cpl:value *control-command*)
-           (setf
-            *control-command-watcher*
-            (cpl:fl-value-changed *control-command* :test #'string=))))
-        (t (roslisp:ros-error
-            (robohow-demo-y3)
-            "Control Command Infrastructure not initialized!"))))
+(defun wait-for-control-command (demo-handle command)
+  (loop while (not (string= (get-control-command demo-handle)
+                            command))))
 
-(defun wait-for-control-command (command)
-  (loop while (not (string= (get-control-command) command))))
+(defun wait-for-control-continue (demo-handle)
+  (wait-for-control-command demo-handle "continue"))
+
+(defun test-demo-handle ()
+  (let ((dh (get-demo-handle)))
+    (wait-for-control-continue dh)
+    (destroy-demo-handle dh)))
 
 ;;;
 ;;; Plan Macros
