@@ -28,3 +28,28 @@
 
 (in-package :cram-robohow-review-year3)
 
+;;;
+;;; Demo Plans
+;;;
+
+;; NOTE(winkler): An initial idea for letting the two robots
+;; collaborate would be through the demo command topic
+;; (`/demo_command'). There already is some infrastructure for this in
+;; `utils.lisp' that allows to blockingly wait for a specific string
+;; there, and send out strings. We could use this as a communication
+;; backend to make the two robots wait for each other, i.e., respect
+;; the current `phase' of the demo.
+
+;; NOTE(winkler): Two top level plans, one for each robot. @georg, is
+;; this feasible for you?
+(def-top-level-cram-function pizza-making-pr2 ()
+  (with-process-modules-pr2
+    (let ((dh (get-demo-handle)))
+      ;; TODO(all): Perform actual PR2 demo plans here
+      (destroy-demo-handle dh))))
+
+(def-top-level-cram-function pizza-making-boxy ()
+  (with-process-modules-boxy
+    (let ((dh (get-demo-handle)))
+      ;; TODO(all): Perform actual Boxy demo plans here
+      (destroy-demo-handle dh))))
