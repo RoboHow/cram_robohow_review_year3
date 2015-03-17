@@ -49,8 +49,7 @@
                             (setf (cpl:value cc-fluent) data))))
      :control-command cc-fluent
      :control-command-watcher (cpl:fl-value-changed
-                               *control-command*
-                               :test #'string=)
+                               cc-fluent :test #'string=)
      :control-command-publisher (roslisp:advertise "/demo_command"
                                                    "std_msgs/String"
                                                    :latch t))))
@@ -263,17 +262,14 @@
   ;(sem-map-coll-env:publish-semantic-map-collision-objects)
   (sem-map-coll-env:publish-semantic-map-collision-objects))
 
-(defun control-command-callback (msg)
-  (with-fields (data) msg
-    (setf (cpl:value *control-command*) data)))
-
 (defun get-control-command (demo-handle)
   (cpl:wait-for (cpl-impl:fl-pulsed
                  (dh-control-command-watcher demo-handle)))
-  (prog1 (cpl:value *control-command*)
+  (prog1 (cpl:value (dh-control-command demo-handle))
     (setf
      (dh-control-command-watcher demo-handle)
-     (cpl:fl-value-changed *control-command* :test #'string=))))
+     (cpl:fl-value-changed (dh-control-command demo-handle)
+                           :test #'string=))))
 
 (defun wait-for-control-command (demo-handle command)
   (loop while (not (string= (get-control-command demo-handle)
@@ -286,11 +282,36 @@
   (roslisp:publish (dh-control-command-publisher demo-handle)
                    (make-message "std_msgs/String" :data command)))
 
-(defun test-demo-handle ()
-  (let ((dh (get-demo-handle)))
-    (send-control-command dh "test")
-    ;(wait-for-control-continue dh)
-    (destroy-demo-handle dh)))
+(defun send-kqml (demo-handle sender receiver content
+                              &optional in-reply-to)
+  (let ((command
+          (cond (in-reply-to
+                 (concatenate
+                  'string
+                  "reply :sender " sender " :receiver " receiver
+                  ":content " content ":in-reply-to " in-reply-to))
+                (t
+                 (concatenate
+                  'string
+                  "tell :sender " sender " :receiver " receiver
+                  ":content " content)))))
+    (send-control-command demo-handle command)))
+
+(defun wait-for-kqml (demo-handle)
+  (let ((control-command (get-control-command demo-handle)))
+    ;; TODO(winkler): Split the string `control-command' here, check
+    ;; for primary expression (first word) and then split the
+    ;; `keyword' constructs after that (pairs of `:keyword
+    ;; value'). Then, return it as a hash table.
+    (make-hash-table)))
+
+(defun wait-as-receiver (demo-handle receiver)
+  (loop for kqml = (wait-for-kqml demo-handle)
+        as is-ok = (not (and (string=
+                              (gethash "receiver" kqml)
+                              receiver)))
+        when is-ok
+          do (return kqml)))
 
 ;;;
 ;;; Plan Macros
