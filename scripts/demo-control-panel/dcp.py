@@ -38,7 +38,7 @@ class DemoControlPanelUI:
     
     def start(self):
         self.showWindow()
-        self.ctrlController.sendCommand("dcp_start")
+        self.ctrlController.sendCommand("tell :content dcpstart :receiver all :sender dcp")
         
         gtk.main()
     
@@ -56,7 +56,7 @@ class DemoControlPanelUI:
             self.glade.get_object("btnContinue").connect("clicked", self.actionContinue)
     
     def actionContinue(self, widget):
-        self.ctrlController.sendCommand("continue")
+        self.ctrlController.sendCommand("tell :content continue :receiver all :sender dcp")
     
     def deleteEvent(self, widget, event, data=None):
         return False
@@ -65,7 +65,7 @@ class DemoControlPanelUI:
         self.quit()
     
     def quit(self):
-        self.ctrlController.sendCommand("dcp_quit")
+        self.ctrlController.sendCommand("tell :content dcpquit :receiver all :sender dcp")
         rospy.sleep(0.1)
         gtk.main_quit()
     
