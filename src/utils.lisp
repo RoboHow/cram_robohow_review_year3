@@ -58,7 +58,91 @@
   (roslisp:unsubscribe (dh-control-command-subscriber demo-handle))
   (roslisp:unadvertise "/demo_command"))
 
+(defun initialize-demo-setup (demo-handle robot
+                              &key enable-logging)
+  "Initializes the demo setup. `demo-handle' is an initialized
+instance of the demo variables, while `robot' is a symbol denoting
+either `PR2' or `Boxy', depending on which top-level plan called this
+function. The parameter `enable-logging' either enables logging, or
+disables it (default)."
+  (declare (ignorable demo-handle robot))
+  ;; Register the location validation function that handles special
+  ;; purpose locations for the demo
+  (cram-designators:register-location-validation-function
+   1 robohow-demo-location-validator)
+  (setf location-costmap::*fixed-frame* "/map")
+  (cram-designators:disable-location-validation-function
+   'bullet-reasoning-designators::check-ik-solution)
+  (cram-designators:disable-location-validation-function
+   'bullet-reasoning-designators::validate-designator-solution)
+  (cram-uima::config-uima)
+  ;; Setting the timeout for action server responses to a high
+  ;; value. Otherwise, the (very long, > 2.0 seconds) motion planning
+  ;; process will just drop the connection and never execute.
+  (setf actionlib::*action-server-timeout* 20)
+  (initialize-bullet robot :debug-window t)
+  (moveit:clear-collision-environment)
+  (sem-map-coll-env:publish-semantic-map-collision-objects)
+  (beliefstate::enable-logging enable-logging))
+
+(defun pose->trans (pose)
+  `(,(tf:x (tf:origin pose))
+    ,(tf:y (tf:origin pose))
+    ,(tf:z (tf:origin pose))))
+
+(defun quaternion->rot (q)
+  `(,(tf:x q) ,(tf:y q) ,(tf:z q) ,(tf:w q)))
+
+(defun pose->rot (pose)
+  (quaternion->rot (tf:orientation pose)))
+
+(defun get-robot-pose (&optional (frame-id "/base_link"))
+  "Gets the current pose of the coordinate frame `frame-id' w.r.t. the
+frame `/map'."
+  (cl-tf2:ensure-pose-stamped-transformed
+   *tf2*
+   (tf:make-pose-stamped
+    frame-id
+    0.0
+    (tf:make-identity-vector)
+    (tf:make-identity-rotation))
+   "/map" :use-current-ros-time t))
+
+(defmethod initialize-bullet (robot &key debug-window)
+  (crs:prolog `(btr:clear-bullet-world))
+  (let* ((robot-pose (get-robot-pose))
+         (urdf-robot
+           (cl-urdf:parse-urdf
+            (roslisp:get-param "robot_description_lowres")))
+         (urdf-kitchen
+           (cl-urdf:parse-urdf
+            (roslisp:get-param "kitchen_description")))
+         (scene-rot (quaternion->rot (tf:euler->quaternion :az pi)))
+         (scene-trans `(-3.45 -4.35 0))
+         (robot-rot (pose->rot robot-pose))
+         (robot-trans (pose->trans robot-pose)))
+    (crs:prolog
+     `(and (btr:clear-bullet-world)
+           (btr:bullet-world ?w)
+           (btr:assert (btr:object
+                        ?w btr:static-plane floor
+                        ((0 0 0) (0 0 0 1))
+                        :normal (0 0 1) :constant 0))
+           ,@(when debug-window
+               `((btr:debug-window ?w)))
+           (btr:robot ?robot)
+           (assert (btr:object
+                    ?w btr:urdf ?robot
+                    (,robot-trans ,robot-rot)
+                    :urdf ,urdf-robot))
+           (assert (btr:object
+                    ?w btr:semantic-map sem-map-kitchen
+                    (,scene-trans ,scene-rot)
+                    :urdf ,urdf-kitchen))))))
+
 (defmacro with-process-modules-pr2 (&body body)
+  "Register and start all process modules necessary for operating the
+PR2."
   `(cpm:with-process-modules-running
        (pr2-manipulation-process-module:pr2-manipulation-process-module
         pr2-navigation-process-module:pr2-navigation-process-module
@@ -67,11 +151,16 @@
      ,@body))
 
 (defmacro with-process-modules-boxy (&body body)
+  "Register and start all process modules necessary for operatinxg
+Boxy."
   `(cpm:with-process-modules-running
        ()
      ,@body))
 
 (defmacro try-n-times (n &body body)
+  "Try a piece of code `body', recovering from failures `n' times
+before escalating the last occured failure to the next higher plan
+entity."
   `(cpl:with-retry-counters ((retry-count ,n))
      (cpl:with-failure-handling
          (((or cram-plan-failures:object-not-found
@@ -82,9 +171,11 @@
               (cpl:retry))))
        ,@body)))
 
-(defun publish-pose (pose &optional (topic "/object"))
+(defun publish-pose (pose-stamped &optional (topic "/object"))
+  "Publish the stamped pose `pose-stamped' onto topic `topic'. `topic'
+defaults to the topic `/object'."
   (let ((adv (roslisp:advertise topic "geometry_msgs/PoseStamped")))
-    (roslisp:publish adv (tf:pose-stamped->msg pose))))
+    (roslisp:publish adv (tf:pose-stamped->msg pose-stamped))))
 
 (defun move-arms-up (&key allowed-collision-objects side ignore-collisions)
   (when (or (eql side :left) (not side))
@@ -151,116 +242,6 @@
                              (when grasp-type
                                `((desig-props:grasp-type ,grasp-type)))))
         collect handle-object))))
-
-(defmethod init-ms-belief-state (&key debug-window objects)
-  (ros-info (bullet) "Clearing bullet world")
-  (crs:prolog `(btr:clear-bullet-world))
-  (let* ((test-0 (ros-info (bullet) "Gathering data"))
-         (robot-pose (get-robot-pose))
-         (test-01 (ros-info (bullet) "Robot pose OK"))
-         (urdf-robot
-           (cl-urdf:parse-urdf
-            (roslisp:get-param "robot_description_lowres")))
-         (test-02 (ros-info (bullet) "Robot description OK"))
-         (urdf-kitchen
-           (cl-urdf:parse-urdf
-            (roslisp:get-param "kitchen_description")))
-         (test-03 (ros-info (bullet) "Kitchen description OK"))
-         (scene-rot-quaternion (tf:euler->quaternion :az pi))
-         (scene-rot `(,(tf:x scene-rot-quaternion)
-                      ,(tf:y scene-rot-quaternion)
-                      ,(tf:z scene-rot-quaternion)
-                      ,(tf:w scene-rot-quaternion)))
-         (scene-trans `(-3.45 -4.35 0))
-         (robot-pose robot-pose)
-         (robot-rot `(,(tf:x (tf:orientation robot-pose))
-                      ,(tf:y (tf:orientation robot-pose))
-                      ,(tf:z (tf:orientation robot-pose))
-                      ,(tf:w (tf:orientation robot-pose))))
-         (robot-trans `(,(tf:x (tf:origin robot-pose))
-                        ,(tf:y (tf:origin robot-pose))
-                        ,(tf:z (tf:origin robot-pose))))
-         (test-1 (ros-info (bullet) "Asserting scene"))
-         (bdgs
-           (car
-            (force-ll
-             (crs:prolog
-              `(and (btr:clear-bullet-world)
-                    (btr:bullet-world ?w)
-                    (btr:assert (btr:object
-                                 ?w btr:static-plane floor
-                                 ((0 0 0) (0 0 0 1))
-                                 :normal (0 0 1) :constant 0))
-                    ,@(when debug-window
-                       `((btr:debug-window ?w)))
-                    (btr:robot ?robot)
-                    ,@(loop for object in objects
-                            for obj-name = (car object)
-                            for obj-pose = (cdr object)
-                            collect `(btr:assert
-                                      (btr:object
-                                       ?w btr:box ,obj-name
-                                       ((,(tf:x (tf:origin obj-pose))
-                                         ,(tf:y (tf:origin obj-pose))
-                                         ,(tf:z (tf:origin obj-pose)))
-                                        (,(tf:x (tf:orientation obj-pose))
-                                         ,(tf:y (tf:orientation obj-pose))
-                                         ,(tf:z (tf:orientation obj-pose))
-                                         ,(tf:w (tf:orientation obj-pose))))
-                                       :mass 0.0 :size (0.1 0.1 0.1))))
-                    (assert (btr:object
-                             ?w btr:urdf ?robot
-                             (,robot-trans ,robot-rot)
-                             :urdf ,urdf-robot))
-                    (assert (btr:object
-                             ?w btr:semantic-map sem-map-kitchen
-                             (,scene-trans ,scene-rot)
-                             :urdf ,urdf-kitchen))))))))
-    (declare (ignore test-0 test-01 test-02 test-03 test-1))
-    (ros-info (bullet) "Check binding for robot")
-    (var-value
-     '?pr2
-     (lazy-car
-      (crs:prolog
-       `(and (btr:robot ?robot)
-             (btr:%object ?w ?robot ?pr2)) bdgs)))
-    (ros-info (bullet) "Check binding for kitchen")
-    (var-value
-     '?sem-map
-     (lazy-car
-      (crs:prolog
-       `(btr:%object ?w sem-map-kitchen ?sem-map) bdgs)))
-    (ros-info (bullet) "Done")
-    (robosherlock-pm::ignore-bullet-object 'sem-map-kitchen)
-    (robosherlock-pm::ignore-bullet-object 'common-lisp::floor)
-    (robosherlock-pm::ignore-bullet-object 'cram-pr2-knowledge::pr2)))
-
-(defun prepare-settings ()
-  (setf location-costmap::*fixed-frame* "/map")
-  ;; NOTE(winkler): This validator breaks IK based `to reach' and `to
-  ;; see' location resolution. Disabling it, since everything works
-  ;; just nicely without it. Gotta look into this later.
-  (cram-designators:disable-location-validation-function
-   'bullet-reasoning-designators::check-ik-solution)
-  ;(cram-designators:disable-location-validation-function
-  ; 'spatial-relations-costmap::potential-field-costmap-pose-function)
-  ;(cram-designators:disable-location-validation-function
-  ; 'spatial-relations-costmap::collision-pose-validator)
-  (cram-designators:disable-location-validation-function
-   'bullet-reasoning-designators::validate-designator-solution)
-  (cram-uima::config-uima)
-  ;; Setting the timeout for action server responses to a high
-  ;; value. Otherwise, the (very long, > 2.0 seconds) motion planning
-  ;; process will just drop the connection and never execute.
-  (setf actionlib::*action-server-timeout* 20)
-  (beliefstate::enable-logging t)
-  (ros-info (longterm) "Init Belief State")
-  (init-ms-belief-state :debug-window t)
-  (setf btr::*bb-comparison-validity-threshold* 0.1)
-  (moveit:clear-collision-environment)
-  ;; Twice, because sometimes a ROS message for an object gets lost.
-  ;(sem-map-coll-env:publish-semantic-map-collision-objects)
-  (sem-map-coll-env:publish-semantic-map-collision-objects))
 
 (defun get-control-command (demo-handle)
   (cpl:wait-for (cpl-impl:fl-pulsed
@@ -378,3 +359,54 @@
                   (t
                    `(achieve `(cram-plan-library::object-placed-at ,,object ,,location))))
          (ensure-arms-up side)))))
+
+;;;
+;;; Locations
+;;;
+
+;;; Location definitions
+
+(defvar *loc-in-front-of-oven*
+  (desig:make-designator
+   'location
+   `((desig-props::pose
+      ,(tf:make-pose-stamped
+        "/map" 0.0
+        (tf:make-3d-vector 0.538 2.035 0.00)
+        (tf:make-quaternion 0.0 0.0 0.0 -1.0)))
+     (desig-props::in-front-of desig-props::oven)))
+  "This location describes a pose for the robot to stand in front of
+the oven.")
+
+;;; Validators
+
+(defun robohow-demo-location-validator (designator solution)
+  "This validator is used for validating all semantic locations used
+throughout the demo experiment."
+  (labels ((pose-within-distance (pose-stamped
+                                  &optional (threshold 0.05))
+             (let ((pose-stamped-map
+                     (cl-tf2:ensure-pose-stamped-transformed
+                      *tf2* pose-stamped (tf:frame-id solution))))
+               (<= (tf:v-dist (tf:make-3d-vector
+                               (tf:x (tf:origin pose-stamped-map))
+                               (tf:y (tf:origin pose-stamped-map))
+                               0.0)
+                              (tf:make-3d-vector
+                               (tf:x (tf:origin solution))
+                               (tf:y (tf:origin solution))
+                               0.0))
+                   threshold))))
+    (cond ((eql (desig-prop-value designator
+                                  'desig-props::in-front-of)
+                'desig-props::oven)
+           (let ((pose (desig-prop-value designator
+                                         'desig-props::pose)))
+             (when (and pose (pose-within-distance pose))
+               :accept))))))
+
+;; Location utility quick functions
+
+(defmacro in-front-of-oven (&body body)
+  `(at-location (,*loc-in-front-of-oven*)
+     ,@body))
