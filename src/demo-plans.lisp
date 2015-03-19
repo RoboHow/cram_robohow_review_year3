@@ -45,11 +45,13 @@
 (def-top-level-cram-function pizza-making-pr2 ()
   (with-process-modules-pr2
     (let ((dh (get-demo-handle)))
+      (initialize-demo-setup dh 'pr2)
       ;; TODO(all): Perform actual PR2 demo plans here
       (destroy-demo-handle dh))))
 
 (def-top-level-cram-function pizza-making-boxy ()
   (with-process-modules-boxy
     (let ((dh (get-demo-handle)))
+      (initialize-demo-setup dh 'boxy)
       ;; TODO(all): Perform actual Boxy demo plans here
       (destroy-demo-handle dh))))
