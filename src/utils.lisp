@@ -193,9 +193,9 @@ defaults to the topic `/object'."
      (tf:make-pose-stamped
       "base_link" (roslisp:ros-time)
       (tf:make-3d-vector 0.3 -0.5 1.3)
-      (tf:euler->quaternion :ax 0));pi))
+      (tf:euler->quaternion :ax 0))
      :ignore-collisions ignore-collisions
-     :allowed-collision-objects allowed-collision-objects)
+     :allowed-collision-objects allowed-collision-objects)))
 
 (defun ensure-arms-up (&optional (side (list :left :right)))
   (cond ((listp side)
@@ -241,7 +241,7 @@ defaults to the topic `/object'."
                                                 ,handle-pose)))))
                              (when grasp-type
                                `((desig-props:grasp-type ,grasp-type)))))
-        collect handle-object))))
+        collect handle-object))
 
 (defun get-control-command (demo-handle)
   (cpl:wait-for (cpl-impl:fl-pulsed
