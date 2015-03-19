@@ -32,6 +32,10 @@
   (:use #:common-lisp #:roslisp #:cram-utilities #:designators-ros
         #:cram-roslisp-common #:cram-designators #:location-costmap
         #:cram-plan-knowledge #:cram-plan-library)
+  (:export
+   ;; Symbols
+   pr2
+   boxy)
   (:import-from :cram-language 
                 top-level fl-funcall with-tags pursue tag retry-after-suspension
                 whenever pulsed value with-task-suspended seq)
@@ -52,4 +56,4 @@
                      #:obstacle #:aware #:pancakemaker #:pancakemix
                      #:pancake #:side #:rightof #:leftof #:handle
                      #:max-handles #:top-slide-down #:behind #:in-front-of
-                     #:left-of #:right-of #:for))
+                     #:left-of #:right-of #:for #:oven))
