@@ -32,7 +32,8 @@
   (control-command-subscriber nil)
   (control-command nil)
   (control-command-watcher nil)
-  (control-command-publisher nil))
+  (control-command-publisher nil)
+  (marker-relative-poses nil))
 
 ;;;
 ;;; Helper functions
@@ -52,7 +53,12 @@
                                cc-fluent :test #'string=)
      :control-command-publisher (roslisp:advertise "/demo_command"
                                                    "std_msgs/String"
-                                                   :latch t))))
+                                                   :latch t)
+     :marker-relative-poses
+     `(("428" ,(tf:make-pose (tf:make-3d-vector 0.0 -0.3 0.0)
+                             (tf:euler->quaternion)))
+       ("213" ,(tf:make-pose (tf:make-3d-vector 0.0 0.3 0.0)
+                             (tf:euler->quaternion)))))))
 
 (defun destroy-demo-handle (demo-handle)
   (roslisp:unsubscribe (dh-control-command-subscriber demo-handle))
@@ -317,6 +323,25 @@ defaults to the topic `/object'."
                      (cpl:retry)))
                 (perceive-object 'cram-plan-library:a ,object))))))
 
+(defmacro perceive-all (object &key stationary (move-head t))
+  `(cpl:with-failure-handling
+       ((cram-plan-failures:object-not-found (f)
+          (declare (ignore f))
+          (ros-warn (longterm) "Object not found. Retrying.")
+          (cpl:retry)))
+     (cond (,stationary
+            (let ((at (desig-prop-value ,object 'desig-props:at)))
+              (when ,move-head
+                (achieve `(cram-plan-library:looking-at ,(reference at))))
+              (perceive-object
+               'cram-plan-library:currently-visible
+               ,object)))
+           (t (cpl:with-failure-handling
+                  ((cram-plan-failures:location-not-reached-failure (f)
+                     (declare (ignore f))
+                     (cpl:retry)))
+                (perceive-object 'cram-plan-library:all ,object))))))
+
 (defmacro pick-object (object &key stationary)
   `(cpl:with-retry-counters ((retry-task 0))
      (cpl:with-failure-handling
@@ -410,3 +435,43 @@ throughout the demo experiment."
 (defmacro in-front-of-oven (&body body)
   `(at-location (,*loc-in-front-of-oven*)
      ,@body))
+
+;;;
+;;; Markers
+;;;
+
+(defun perceive-markers ()
+  )
+
+(defun marker-id->pose (marker-pose-pairs id)
+  (find id marker-pose-pairs
+        :test (lambda (id marker-pose-pair)
+                (destructuring-bind (marker pose)
+                    marker-pose-pair
+                  (declare (ignore pose))
+                  (string=
+                   (desig-prop-value
+                    marker 'desig-props::id)
+                   id)))))
+
+(defun markers-relative-pose->absolute-poses
+    (demo-handle perceived-markers relative-pose)
+  (mapcar (lambda (perceived-marker)
+            (when (eql (desig-prop-value perceived-marker 'type)
+                       'armarker)
+              (let ((marker-id (desig-prop-value perceived-marker 'id)))
+                (when marker-id
+                  (let ((marker-relative-pose (marker-id->pose
+                                               (dh-marker-relative-poses
+                                                demo-handle)
+                                               marker-id))
+                        (marker-at (reference (desig-prop-value
+                                               perceived-marker 'at))))
+                    (tf:pose->pose-stamped
+                     "/map" 0.0
+                     (cl-transforms:transform-pose
+                      (cl-transforms:transform-pose
+                       relative-pose
+                       (tf:pose->transform marker-relative-pose))
+                      (tf:pose->transform marker-at))))))))
+          perceived-markers))
