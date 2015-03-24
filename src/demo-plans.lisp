@@ -55,3 +55,20 @@
       (initialize-demo-setup dh 'boxy)
       ;; TODO(all): Perform actual Boxy demo plans here
       (destroy-demo-handle dh))))
+
+(def-cram-function shove-tray-into-oven (demo-handle)
+  ;(in-front-of-island demo-handle
+  ;  (format t "I'm picking up the tray here.~%"))
+  (in-front-of-oven demo-handle
+    (look-at-marker-suitable-pose)
+    (let ((perceived-markers
+            (loop for markers = (perceive-markers)
+                  while (not markers)
+                  finally (return markers))))
+      (format t "Found ~a marker(s)~%" (length perceived-markers))
+      (labels ((marker-relative-pose (relative-pose)
+                 (markers-relative-pose->absolute-poses
+                  demo-handle perceived-markers relative-pose)))
+        (publish-pose (first (marker-relative-pose
+                              (tf:make-identity-pose)))
+                      "/marker")))))

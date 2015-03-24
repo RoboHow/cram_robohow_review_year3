@@ -61,4 +61,4 @@
                      #:pancake #:side #:rightof #:leftof #:handle
                      #:max-handles #:top-slide-down #:behind #:in-front-of
                      #:left-of #:right-of #:for #:oven #:armarker #:id
-                     #:dimensions #:pose #:tray))
+                     #:dimensions #:pose #:tray #:island))

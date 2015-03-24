@@ -33,7 +33,9 @@
   (control-command nil)
   (control-command-watcher nil)
   (control-command-publisher nil)
-  (marker-relative-poses nil))
+  (marker-relative-poses nil)
+  (loc-in-front-of-oven nil)
+  (loc-in-front-of-island nil))
 
 ;;;
 ;;; Helper functions
@@ -55,10 +57,29 @@
                                                    "std_msgs/String"
                                                    :latch t)
      :marker-relative-poses
-     `(("428" ,(tf:make-pose (tf:make-3d-vector 0.0 -0.3 0.0)
-                             (tf:euler->quaternion)))
+     `(("428" ,(tf:make-pose (tf:make-3d-vector 0.01 0.015 0.278)
+                             (tf:euler->quaternion
+                              :ay (- (/ pi -2) 0.028) :az 0.016)))
        ("213" ,(tf:make-pose (tf:make-3d-vector 0.0 0.3 0.0)
-                             (tf:euler->quaternion)))))))
+                             (tf:euler->quaternion :ay (/ pi -2)))))
+     :loc-in-front-of-oven
+     (desig:make-designator
+      'location
+      `((desig-props::pose
+         ,(tf:make-pose-stamped
+           "/map" 0.0
+           (tf:make-3d-vector 0.538 1.9 0.0) ;;2.035
+           (tf:make-quaternion 0.0 0.0 0.0 -1.0)))
+        (desig-props:in-front-of desig-props:oven)))
+     :loc-in-front-of-island
+     (desig:make-designator
+      'location
+      `((desig-props::pose
+         ,(tf:make-pose-stamped
+           "/map" 0.0
+           (tf:make-3d-vector -0.323 1.437 0.0)
+           (tf:make-quaternion 0 0 1 0.03)))
+        (desig-props:in-front-of desig-props:island))))))
 
 (defun destroy-demo-handle (demo-handle)
   (roslisp:unsubscribe (dh-control-command-subscriber demo-handle))
@@ -389,27 +410,13 @@ defaults to the topic `/object'."
 ;;; Locations
 ;;;
 
-;;; Location definitions
-
-(defvar *loc-in-front-of-oven*
-  (desig:make-designator
-   'location
-   `((desig-props::pose
-      ,(tf:make-pose-stamped
-        "/map" 0.0
-        (tf:make-3d-vector 0.538 2.035 0.00)
-        (tf:make-quaternion 0.0 0.0 0.0 -1.0)))
-     (desig-props::in-front-of desig-props::oven)))
-  "This location describes a pose for the robot to stand in front of
-the oven.")
-
 ;;; Validators
 
 (defun robohow-demo-location-validator (designator solution)
   "This validator is used for validating all semantic locations used
 throughout the demo experiment."
   (labels ((pose-within-distance (pose-stamped
-                                  &optional (threshold 0.05))
+                                  &optional (threshold 0.10))
              (let ((pose-stamped-map
                      (cl-tf2:ensure-pose-stamped-transformed
                       *tf2* pose-stamped (tf:frame-id solution))))
@@ -422,23 +429,45 @@ throughout the demo experiment."
                                (tf:y (tf:origin solution))
                                0.0))
                    threshold))))
-    (cond ((eql (desig-prop-value designator
-                                  'desig-props::in-front-of)
-                'desig-props::oven)
-           (let ((pose (desig-prop-value designator
-                                         'desig-props::pose)))
+    (cond ((or (eql (desig-prop-value
+                     designator 'desig-props:in-front-of)
+                    'desig-props:oven)
+               (eql (desig-prop-value
+                     designator 'desig-props:in-front-of)
+                    'desig-props:island))
+           (let ((pose (desig-prop-value designator 'desig-props:pose)))
              (when (and pose (pose-within-distance pose))
                :accept))))))
 
 ;; Location utility quick functions
 
-(defmacro in-front-of-oven (&body body)
-  `(at-location (,*loc-in-front-of-oven*)
+(defmacro in-front-of (location try-indefinitely &body body)
+  `(cpl:with-failure-handling
+       ((cram-plan-failures:location-not-reached-failure (f)
+          (declare (ignore f))
+          (when ,try-indefinitely
+            (cpl:retry))))
+     (at-location (,location)
+       ,@body)))
+
+(defmacro in-front-of-oven (demo-handle &body body)
+  `(in-front-of (dh-loc-in-front-of-oven ,demo-handle) t
+     ,@body))
+
+(defmacro in-front-of-island (demo-handle &body body)
+  `(in-front-of (dh-loc-in-front-of-island ,demo-handle) t
      ,@body))
 
 ;;;
 ;;; Markers
 ;;;
+
+(defun look-at-marker-suitable-pose ()
+  (achieve `(cram-plan-library:looking-at
+             ,(tf:make-pose-stamped
+               "/base_link" 0.0
+               (tf:make-3d-vector 1.0 0.0 1.0)
+               (tf:euler->quaternion)))))
 
 (defun perceive-markers ()
   (with-designators ((marker (object `((type armarker)))))
@@ -447,15 +476,12 @@ throughout the demo experiment."
                   :move-head nil)))
 
 (defun marker-id->pose (marker-pose-pairs id)
-  (find id marker-pose-pairs
-        :test (lambda (id marker-pose-pair)
-                (destructuring-bind (marker pose)
-                    marker-pose-pair
-                  (declare (ignore pose))
-                  (string=
-                   (desig-prop-value
-                    marker 'desig-props::id)
-                   id)))))
+  (cadr (find id marker-pose-pairs
+              :test (lambda (id marker-pose-pair)
+                      (destructuring-bind (marker pose)
+                          marker-pose-pair
+                        (declare (ignore pose))
+                        (string= marker id))))))
 
 (defun markers-relative-pose->absolute-poses
     (demo-handle perceived-markers relative-pose)
@@ -473,8 +499,11 @@ throughout the demo experiment."
                     (tf:pose->pose-stamped
                      "/map" 0.0
                      (cl-transforms:transform-pose
+                      (tf:pose->transform marker-at)
                       (cl-transforms:transform-pose
-                       relative-pose
-                       (tf:pose->transform marker-relative-pose))
-                      (tf:pose->transform marker-at))))))))
+                       (tf:transform-inv
+                        (tf:pose->transform marker-relative-pose))
+                       (tf:transform->pose
+                        (tf:transform-inv (tf:pose->transform
+                                           relative-pose)))))))))))
           perceived-markers))
