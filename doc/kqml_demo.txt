@@ -1,0 +1,32 @@
+* Boxy
+tell :sender Boxy
+     :receiver PR2
+     :content "bring sauce to table"
+
+* PR2
+reply :sender PR2
+      :receiver Boxy
+      :in-reply-to "bring sauce to table"
+      :content "brought sauce to table"
+
+* Boxy
+tell :sender Boxy
+     :receiver PR2
+     :content "bring spoon to table"
+
+* PR2
+reply :sender PR2
+      :receiver Boxy
+      :in-reply-to "bring spoon to table"
+      :content "brought spoon to table"
+
+* Boxy
+tell :sender Boxy
+     :receiver PR2
+     :content "put tray into oven"
+
+* PR2
+reply :sender PR2
+      :receiver Boxy
+      :in-reply-to "place tray into oven"
+      :content "placed tray into oven"
