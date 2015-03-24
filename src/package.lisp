@@ -61,4 +61,8 @@
                      #:pancake #:side #:rightof #:leftof #:handle
                      #:max-handles #:top-slide-down #:behind #:in-front-of
                      #:left-of #:right-of #:for #:oven #:armarker #:id
-                     #:dimensions #:pose #:tray #:island))
+                     #:dimensions #:pose #:tray #:island #:carry-handles
+                     #:grasp-type #:black #:yellow #:white #:grey #:red
+                     #:blu #:cyan #:magenta #:green #:timestamp
+                     #:plane-distance #:segment #:dimensions-2d #:on
+                     #:name))
