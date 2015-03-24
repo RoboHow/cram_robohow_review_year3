@@ -45,6 +45,10 @@
                 action-desig? 
                 desig-prop
                 action-desig)
+  (:import-from :robosherlock-process-module
+                infer-object-property
+                perceived-object-invalid
+                object-handle)
   (:import-from :cram-language-designator-support with-designators)
   (:import-from :cram-language def-cram-function def-top-level-cram-function)
   (:import-from :cram-reasoning def-fact-group <- not)
@@ -56,4 +60,5 @@
                      #:obstacle #:aware #:pancakemaker #:pancakemix
                      #:pancake #:side #:rightof #:leftof #:handle
                      #:max-handles #:top-slide-down #:behind #:in-front-of
-                     #:left-of #:right-of #:for #:oven))
+                     #:left-of #:right-of #:for #:oven #:armarker #:id
+                     #:dimensions #:pose #:tray))

@@ -441,7 +441,10 @@ throughout the demo experiment."
 ;;;
 
 (defun perceive-markers ()
-  )
+  (with-designators ((marker (object `((type armarker)))))
+    (perceive-all marker
+                  :stationary t
+                  :move-head nil)))
 
 (defun marker-id->pose (marker-pose-pairs id)
   (find id marker-pose-pairs

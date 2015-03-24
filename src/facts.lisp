@@ -28,11 +28,21 @@
 
 (in-package :cram-robohow-review-year3)
 
+(defun object-color (colors color)
+  (let ((color-pair (find color colors :test (lambda (x y) (eql x (car y))))))
+    (if color-pair
+        (cadr color-pair)
+        0.0d0)))
+
 (def-fact-group object-refinement-facts (infer-object-property
                                          object-handle
                                          cram-language::grasp-effort
                                          reorient-object)
 
+  (<- (object-color ?object ?color ?value)
+    (desig-prop ?object (desig-props:color ?colors))
+    (crs:lisp-fun object-color ?colors ?color ?value))
+  
   (<- (make-handles ?segments ?offset-angle ?handles)
     (symbol-value pi ?pi)
     (crs:lisp-fun / ?pi 2 ?pi-half)
@@ -55,7 +65,7 @@
   (<- (reorient-object ?object t)
     (desig-prop ?object (desig-props::type desig-props::bowl)))
   
-  (<- (infer-object-property ?object desig-props:type desig-props::tray)
+  (<- (infer-object-property ?object desig-props:type desig-props:tray)
     (object-color ?object desig-props:black ?black)
     (> ?black 0.7))
   
