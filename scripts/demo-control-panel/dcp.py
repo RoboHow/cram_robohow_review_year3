@@ -37,12 +37,34 @@ class DemoControlPanelUI:
         self.prepareUI()
     
     def start(self):
-        self.showWindow()
         self.ctrlController.sendCommand("tell :content dcpstart :receiver all :sender dcp")
+        self.showInitializerWindow()
         
         gtk.main()
     
+    def initialize(self):
+        self.showMainWindow()
+    
     def prepareUI(self):
+        self.wndInitializer = self.glade.get_object("wndInitializer")
+        
+        if self.wndInitializer:
+            self.wndInitializer.set_keep_above(True)
+            self.wndInitializer.connect("delete_event", self.deleteEvent)
+            self.wndInitializer.connect("destroy", self.destroy)
+            self.wndInitializer.set_title("Choose ROS Master Hosts")
+            
+            self.glade.get_object("btnInitializerQuit").connect("clicked", self.destroy);
+            self.glade.get_object("btnInitialize").connect("clicked", self.initialize);
+            self.renderer = gtk.CellRendererText()
+            
+            self.glade.get_object("ddHost1").append_text("http://localhost:11311");
+            self.glade.get_object("ddHost1").append_text("http://pr2a:11311");
+            self.glade.get_object("ddHost1").append_text("http://leela:11311");
+            self.glade.get_object("ddHost2").append_text("http://localhost:11311");
+            self.glade.get_object("ddHost2").append_text("http://pr2a:11311");
+            self.glade.get_object("ddHost2").append_text("http://leela:11311");
+        
         self.wndMain = self.glade.get_object("wndMain")
         
         if self.wndMain:
@@ -69,8 +91,11 @@ class DemoControlPanelUI:
         rospy.sleep(0.1)
         gtk.main_quit()
     
-    def showWindow(self):
+    def showMainWindow(self):
         self.wndMain.show_all()
+    
+    def showInitializerWindow(self):
+        self.wndInitializer.show_all()
 
 
 if __name__ == "__main__":
