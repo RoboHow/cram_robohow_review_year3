@@ -35,7 +35,9 @@
   (control-command-publisher nil)
   (marker-relative-poses nil)
   (loc-in-front-of-oven nil)
-  (loc-in-front-of-island nil))
+  (loc-in-front-of-island nil)
+  (obj-tray nil)
+  (obj-marker nil))
 
 ;;;
 ;;; Helper functions
@@ -79,7 +81,14 @@
            "/map" 0.0
            (tf:make-3d-vector -0.323 1.437 0.0)
            (tf:make-quaternion 0 0 1 0.03)))
-        (desig-props:in-front-of desig-props:island))))))
+        (desig-props:in-front-of desig-props:island)))
+     :obj-tray (make-designator
+                'object `((type tray)
+                          (at ,(make-designator
+                                'location
+                                `((on Cupboard)
+                                  (name "kitchen_island"))))))
+     :obj-marker (make-designator 'object `((type armarker))))))
 
 (defun destroy-demo-handle (demo-handle)
   (roslisp:unsubscribe (dh-control-command-subscriber demo-handle))
@@ -148,24 +157,25 @@ frame `/map'."
          (scene-trans `(-3.45 -4.35 0))
          (robot-rot (pose->rot robot-pose))
          (robot-trans (pose->trans robot-pose)))
-    (crs:prolog
-     `(and (btr:clear-bullet-world)
-           (btr:bullet-world ?w)
-           (btr:assert (btr:object
-                        ?w btr:static-plane floor
-                        ((0 0 0) (0 0 0 1))
-                        :normal (0 0 1) :constant 0))
-           ,@(when debug-window
-               `((btr:debug-window ?w)))
-           (btr:robot ?robot)
-           (assert (btr:object
-                    ?w btr:urdf ?robot
-                    (,robot-trans ,robot-rot)
-                    :urdf ,urdf-robot))
-           (assert (btr:object
-                    ?w btr:semantic-map sem-map-kitchen
-                    (,scene-trans ,scene-rot)
-                    :urdf ,urdf-kitchen))))))
+    (force-ll
+     (crs:prolog
+      `(and (btr:clear-bullet-world)
+            (btr:bullet-world ?w)
+            (btr:assert (btr:object
+                         ?w btr:static-plane floor
+                         ((0 0 0) (0 0 0 1))
+                         :normal (0 0 1) :constant 0))
+            ,@(when debug-window
+                `((btr:debug-window ?w)))
+            (btr:robot ?robot)
+            (assert (btr:object
+                     ?w btr:urdf ?robot
+                     (,robot-trans ,robot-rot)
+                     :urdf ,urdf-robot))
+            (assert (btr:object
+                     ?w btr:semantic-map sem-map-kitchen
+                     (,scene-trans ,scene-rot)
+                     :urdf ,urdf-kitchen)))))))
 
 (defmacro with-process-modules-pr2 (&body body)
   "Register and start all process modules necessary for operating the
@@ -197,6 +207,15 @@ entity."
             (cpl:do-retry retry-count
               (cpl:retry))))
        ,@body)))
+
+(defmacro try-forever (&body body)
+  `(cpl:with-failure-handling
+       (((or cram-plan-failures:object-not-found
+             cram-plan-failures:manipulation-failure
+             cram-plan-failures:location-not-reached-failure) (f)
+          (declare (ignore f))
+          (cpl:retry)))
+     ,@body))
 
 (defun publish-pose (pose-stamped &optional (topic "/object"))
   "Publish the stamped pose `pose-stamped' onto topic `topic'. `topic'
@@ -324,6 +343,11 @@ defaults to the topic `/object'."
 ;;;
 ;;; Plan Macros
 ;;;
+
+(defmacro ensure-results (function)
+  `(loop for results = (funcall ,function)
+         while (not results)
+         finally (return results)))
 
 (defmacro perceive-a (object &key stationary (move-head t))
   `(cpl:with-failure-handling
@@ -459,6 +483,15 @@ throughout the demo experiment."
      ,@body))
 
 ;;;
+;;; Tray
+;;;
+
+(defun perceive-tray (demo-handle)
+  (perceive-a (dh-obj-tray demo-handle)
+              :stationary t
+              :move-head nil))
+
+;;;
 ;;; Markers
 ;;;
 
@@ -469,11 +502,10 @@ throughout the demo experiment."
                (tf:make-3d-vector 1.0 0.0 1.0)
                (tf:euler->quaternion)))))
 
-(defun perceive-markers ()
-  (with-designators ((marker (object `((type armarker)))))
-    (perceive-all marker
-                  :stationary t
-                  :move-head nil)))
+(defun perceive-markers (demo-handle)
+  (perceive-all (dh-obj-marker demo-handle)
+                :stationary t
+                :move-head nil))
 
 (defun marker-id->pose (marker-pose-pairs id)
   (cadr (find id marker-pose-pairs

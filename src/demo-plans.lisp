@@ -47,6 +47,9 @@
     (let ((dh (get-demo-handle)))
       (initialize-demo-setup dh 'pr2)
       ;; TODO(all): Perform actual PR2 demo plans here
+      ;; Do everything pizza-making related here before moving the tray
+      (fetch-tray dh)
+      ;(shove-tray-into-oven dh)
       (destroy-demo-handle dh))))
 
 (def-top-level-cram-function pizza-making-boxy ()
@@ -56,16 +59,19 @@
       ;; TODO(all): Perform actual Boxy demo plans here
       (destroy-demo-handle dh))))
 
+(def-cram-function fetch-tray (demo-handle)
+  (in-front-of-island demo-handle
+    (try-forever
+      (pick-object (dh-obj-tray demo-handle) :stationary t))))
+
 (def-cram-function shove-tray-into-oven (demo-handle)
-  ;(in-front-of-island demo-handle
-  ;  (format t "I'm picking up the tray here.~%"))
   (in-front-of-oven demo-handle
     (look-at-marker-suitable-pose)
-    (let ((perceived-markers
-            (loop for markers = (perceive-markers)
-                  while (not markers)
-                  finally (return markers))))
-      (format t "Found ~a marker(s)~%" (length perceived-markers))
+    (let ((perceived-markers (ensure-results
+                              (lambda ()
+                                (perceive-markers demo-handle)))))
+      (ros-info (rh demo) "Found ~a marker(s)~%"
+                (length perceived-markers))
       (labels ((marker-relative-pose (relative-pose)
                  (markers-relative-pose->absolute-poses
                   demo-handle perceived-markers relative-pose)))
