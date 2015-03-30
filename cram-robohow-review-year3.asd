@@ -34,7 +34,6 @@
   :licence "BSD"
   :description "CRAM code for RoboHow Year 3 review"
   :depends-on (roslisp
-               designators-ros
                cram-roslisp-common
                cram-plan-library
                cram-reasoning
