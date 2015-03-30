@@ -104,9 +104,9 @@ disables it (default)."
   (declare (ignorable demo-handle robot))
   ;; Register the location validation function that handles special
   ;; purpose locations for the demo
+  (setf location-costmap::*fixed-frame* "/map")
   (cram-designators:register-location-validation-function
    1 robohow-demo-location-validator)
-  (setf location-costmap::*fixed-frame* "/map")
   (cram-designators:disable-location-validation-function
    'bullet-reasoning-designators::check-ik-solution)
   (cram-designators:disable-location-validation-function
@@ -175,7 +175,10 @@ frame `/map'."
             (assert (btr:object
                      ?w btr:semantic-map sem-map-kitchen
                      (,scene-trans ,scene-rot)
-                     :urdf ,urdf-kitchen)))))))
+                     :urdf ,urdf-kitchen))))))
+  (robosherlock-pm::ignore-bullet-object 'sem-map-kitchen)
+  (robosherlock-pm::ignore-bullet-object 'common-lisp::floor)
+  (robosherlock-pm::ignore-bullet-object 'cram-pr2-knowledge::pr2))
 
 (defmacro with-process-modules-pr2 (&body body)
   "Register and start all process modules necessary for operating the
@@ -349,24 +352,32 @@ defaults to the topic `/object'."
          while (not results)
          finally (return results)))
 
-(defmacro perceive-a (object &key stationary (move-head t))
-  `(cpl:with-failure-handling
-       ((cram-plan-failures:object-not-found (f)
-          (declare (ignore f))
-          (ros-warn (longterm) "Object not found. Retrying.")
-          (cpl:retry)))
-     (cond (,stationary
-            (let ((at (desig-prop-value ,object 'desig-props:at)))
-              (when ,move-head
-                (achieve `(cram-plan-library:looking-at ,(reference at))))
-              (first (perceive-object
-                      'cram-plan-library:currently-visible
-                      ,object))))
-           (t (cpl:with-failure-handling
-                  ((cram-plan-failures:location-not-reached-failure (f)
-                     (declare (ignore f))
-                     (cpl:retry)))
-                (perceive-object 'cram-plan-library:a ,object))))))
+(defmacro perceive-a (object &key stationary (move-head t) equate)
+  `(let ((perceived-object
+           (cpl:with-failure-handling
+               ((cram-plan-failures:object-not-found (f)
+                  (declare (ignore f))
+                  (ros-warn
+                   (longterm) "Object not found. Retrying.")
+                  (cpl:retry)))
+             (cond (,stationary
+                    (let ((at (desig-prop-value
+                               ,object 'desig-props:at)))
+                      (when ,move-head
+                        (achieve `(cram-plan-library:looking-at
+                                   ,(reference at))))
+                      (first (perceive-object
+                              'cram-plan-library:currently-visible
+                              ,object))))
+                   (t (cpl:with-failure-handling
+                          ((cram-plan-failures:location-not-reached-failure (f)
+                             (declare (ignore f))
+                             (cpl:retry)))
+                        (perceive-object 'cram-plan-library:a
+                                         ,object)))))))
+     (when ,equate
+       (equate ,object perceived-object))
+     perceived-object))
 
 (defmacro perceive-all (object &key stationary (move-head t))
   `(cpl:with-failure-handling
@@ -489,7 +500,8 @@ throughout the demo experiment."
 (defun perceive-tray (demo-handle)
   (perceive-a (dh-obj-tray demo-handle)
               :stationary t
-              :move-head nil))
+              :move-head nil
+              :equate t))
 
 ;;;
 ;;; Markers

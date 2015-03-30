@@ -49,7 +49,7 @@
       ;; TODO(all): Perform actual PR2 demo plans here
       ;; Do everything pizza-making related here before moving the tray
       (fetch-tray dh)
-      ;(shove-tray-into-oven dh)
+      (shove-tray-into-oven dh)
       (destroy-demo-handle dh))))
 
 (def-top-level-cram-function pizza-making-boxy ()
@@ -62,7 +62,7 @@
 (def-cram-function fetch-tray (demo-handle)
   (in-front-of-island demo-handle
     (try-forever
-      (pick-object (dh-obj-tray demo-handle) :stationary t))))
+      (pick-object (perceive-tray demo-handle) :stationary t))))
 
 (def-cram-function shove-tray-into-oven (demo-handle)
   (in-front-of-oven demo-handle
