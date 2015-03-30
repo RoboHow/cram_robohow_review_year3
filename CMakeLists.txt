@@ -29,8 +29,7 @@ find_package(catkin REQUIRED COMPONENTS
   robosherlock_process_module
   roslisp
   roslisp_utilities
-  semantic_map_costmap
-)
+  semantic_map_costmap)
 
 catkin_package()
 include_directories(
