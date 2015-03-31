@@ -551,3 +551,15 @@ throughout the demo experiment."
                         (tf:transform-inv (tf:pose->transform
                                            relative-pose)))))))))))
           perceived-markers))
+
+(defmacro with-logging-enabled (&body body)
+  `(let ((logging-state (beliefstate:logging-enabled)))
+     (beliefstate:enable-logging t)
+     (progn ,@body)
+     (beliefstate:enable-logging logging-state)))
+
+(defmacro with-logging-disabled (&body body)
+  `(let ((logging-state (beliefstate:logging-enabled)))
+     (beliefstate:enable-logging nil)
+     (progn ,@body)
+     (beliefstate:enable-logging logging-state)))
