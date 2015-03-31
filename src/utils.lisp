@@ -563,3 +563,30 @@ throughout the demo experiment."
      (beliefstate:enable-logging nil)
      (progn ,@body)
      (beliefstate:enable-logging logging-state)))
+
+(defun wait-for-kqml-message (demo-handle sender receiver content)
+  (declare (ignore demo-handle sender receiver content))
+  (ros-error (demo) "IMPLEMENT ME: `wait-for-kqml-message'"))
+
+(defun wait-for-human-near-oven (demo-handle)
+  (declare (ignore demo-handle))
+  (ros-error (demo) "IMPLEMENT ME: `wait-for-human-near-oven'"))
+
+(defun is-message-on-topic (demo-handle topic topic-type)
+  (declare (ignore demo-handle))
+  (let ((message-present nil))
+    (labels ((message-function (msg)
+               (declare (ignore msg))
+               (setf message-present t)))
+      (let ((subscriber (roslisp:subscribe
+                         topic topic-type
+                         #'message-function)))
+        (sleep 0.5)
+        (roslisp:unsubscribe subscriber)
+        message-present))))
+
+(defun perceive-tracked-human (demo-handle)
+  (loop until (is-message-on-topic
+               demo-handle
+               "/RoboSherlock_jworch/person"
+               "person_msgs/Person")))

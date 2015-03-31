@@ -78,3 +78,12 @@
         (publish-pose (first (marker-relative-pose
                               (tf:make-identity-pose)))
                       "/marker")))))
+
+(def-cram-function track-human (demo-handle)
+  (wait-for-kqml-message demo-handle 'pr2 'boxy "tray placed in oven")
+  (with-logging-disabled
+    (perceive-tracked-human demo-handle))
+  (with-logging-enabled
+    (loop until (wait-for-kqml-message
+                 demo-handle
+                 'pr2 'boxy "tray appeared on kitchen_island"))))
