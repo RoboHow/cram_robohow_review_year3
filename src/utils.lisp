@@ -68,19 +68,21 @@
      (desig:make-designator
       'location
       `((desig-props::pose
-         ,(tf:make-pose-stamped
-           "/map" 0.0
-           (tf:make-3d-vector 0.538 1.9 0.0) ;;2.035
-           (tf:make-quaternion 0.0 0.0 0.0 -1.0)))
+         ,(cl-transforms-plugin:make-pose-stamped
+           (cl-tf:make-pose
+            (tf:make-3d-vector 0.538 1.9 0.0) ;;2.035
+            (tf:make-quaternion 0.0 0.0 0.0 -1.0))
+           "/map" 0.0))
         (desig-props:in-front-of desig-props:oven)))
      :loc-in-front-of-island
      (desig:make-designator
       'location
       `((desig-props::pose
-         ,(tf:make-pose-stamped
-           "/map" 0.0
-           (tf:make-3d-vector -0.323 1.437 0.0)
-           (tf:make-quaternion 0 0 1 0.03)))
+         ,(cl-transforms-plugin:make-pose-stamped
+           (cl-tf:make-pose
+            (tf:make-3d-vector -0.323 1.437 0.0)
+            (tf:make-quaternion 0 0 1 0.03))
+           "/map" 0.0))
         (desig-props:in-front-of desig-props:island)))
      :obj-tray (make-designator
                 'object `((type tray)
@@ -231,19 +233,21 @@ defaults to the topic `/object'."
   (when (or (eql side :left) (not side))
     (pr2-manip-pm::execute-move-arm-pose
      :left
-     (tf:make-pose-stamped
-      "base_link" (roslisp:ros-time)
-      (tf:make-3d-vector 0.3 0.5 1.3)
-      (tf:euler->quaternion :ax 0));pi))
+     (cl-transforms-plugin:make-pose-stamped
+      (cl-tf:make-pose
+       (tf:make-3d-vector 0.3 0.5 1.3)
+       (tf:euler->quaternion :ax 0))
+      "base_link" (roslisp:ros-time))
      :ignore-collisions ignore-collisions
      :allowed-collision-objects allowed-collision-objects))
   (when (or (eql side :right) (not side))
     (pr2-manip-pm::execute-move-arm-pose
      :right
-     (tf:make-pose-stamped
-      "base_link" (roslisp:ros-time)
-      (tf:make-3d-vector 0.3 -0.5 1.3)
-      (tf:euler->quaternion :ax 0))
+     (cl-transforms-plugin:make-pose-stamped
+      (cl-tf:make-pose
+       (tf:make-3d-vector 0.3 -0.5 1.3)
+       (tf:euler->quaternion :ax 0))
+      "base_link" (roslisp:ros-time))
      :ignore-collisions ignore-collisions
      :allowed-collision-objects allowed-collision-objects)))
 
@@ -511,10 +515,11 @@ throughout the demo experiment."
 
 (defun look-at-marker-suitable-pose ()
   (achieve `(cram-plan-library:looking-at
-             ,(tf:make-pose-stamped
-               "/base_link" 0.0
-               (tf:make-3d-vector 1.0 0.0 1.0)
-               (tf:euler->quaternion)))))
+             ,(cl-transforms-plugin:make-pose-stamped
+               (cl-tf:make-pose
+                (tf:make-3d-vector 1.0 0.0 1.0)
+                (tf:euler->quaternion))
+               "/base_link" 0.0))))
 
 (defun perceive-markers (demo-handle)
   (perceive-all (dh-obj-marker demo-handle)
