@@ -135,14 +135,15 @@ disables it (default)."
 (defun get-robot-pose (&optional (frame-id "/base_link"))
   "Gets the current pose of the coordinate frame `frame-id' w.r.t. the
 frame `/map'."
-  (cl-tf2:ensure-pose-stamped-transformed
-   *tf2*
-   (tf:make-pose-stamped
-    frame-id
-    0.0
-    (tf:make-identity-vector)
-    (tf:make-identity-rotation))
-   "/map" :use-current-ros-time t))
+  (cl-tf2:do-transform
+    *tf2*
+    (cl-transforms-plugin:make-pose-stamped
+     (cl-transforms:make-pose
+      (tf:make-identity-vector)
+      (tf:make-identity-rotation))
+     frame-id
+     0.0)
+    "/map"))
 
 (defmethod initialize-bullet (robot &key debug-window)
   (crs:prolog `(btr:clear-bullet-world))
@@ -453,8 +454,9 @@ throughout the demo experiment."
   (labels ((pose-within-distance (pose-stamped
                                   &optional (threshold 0.10))
              (let ((pose-stamped-map
-                     (cl-tf2:ensure-pose-stamped-transformed
-                      *tf2* pose-stamped (tf:frame-id solution))))
+                     (cl-tf2:do-transform
+                      *tf2* pose-stamped
+                       (cl-tf2:get-frame-id solution))))
                (<= (tf:v-dist (tf:make-3d-vector
                                (tf:x (tf:origin pose-stamped-map))
                                (tf:y (tf:origin pose-stamped-map))
