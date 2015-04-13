@@ -59,19 +59,19 @@
                                                    "std_msgs/String"
                                                    :latch t)
      :marker-relative-poses
-     `(("428" ,(tf:make-pose (tf:make-3d-vector 0.01 0.015 0.278)
-                             (tf:euler->quaternion
-                              :ay (- (/ pi -2) 0.028) :az 0.016)))
-       ("213" ,(tf:make-pose (tf:make-3d-vector 0.0 0.3 0.0)
-                             (tf:euler->quaternion :ay (/ pi -2)))))
+     `(("428" ,(cl-transforms:make-pose (cl-transforms:make-3d-vector 0.01 0.015 0.278)
+                                        (cl-transforms:euler->quaternion
+                                         :ay (- (/ pi -2) 0.028) :az 0.016)))
+       ("213" ,(cl-transforms:make-pose (cl-transforms:make-3d-vector 0.0 0.3 0.0)
+                                        (cl-transforms:euler->quaternion :ay (/ pi -2)))))
      :loc-in-front-of-oven
      (desig:make-designator
       'location
       `((desig-props::pose
          ,(cl-transforms-plugin:make-pose-stamped
-           (cl-tf:make-pose
-            (tf:make-3d-vector 0.538 1.9 0.0) ;;2.035
-            (tf:make-quaternion 0.0 0.0 0.0 -1.0))
+           (cl-transforms:make-pose
+            (cl-transforms:make-3d-vector 0.538 1.9 0.0) ;;2.035
+            (cl-transforms:make-quaternion 0.0 0.0 0.0 -1.0))
            "/map" 0.0))
         (desig-props:in-front-of desig-props:oven)))
      :loc-in-front-of-island
@@ -79,9 +79,9 @@
       'location
       `((desig-props::pose
          ,(cl-transforms-plugin:make-pose-stamped
-           (cl-tf:make-pose
-            (tf:make-3d-vector -0.323 1.437 0.0)
-            (tf:make-quaternion 0 0 1 0.03))
+           (cl-transforms:make-pose
+            (cl-transforms:make-3d-vector -0.323 1.437 0.0)
+            (cl-transforms:make-quaternion 0 0 1 0.03))
            "/map" 0.0))
         (desig-props:in-front-of desig-props:island)))
      :obj-tray (make-designator
@@ -124,15 +124,15 @@ disables it (default)."
   (beliefstate::enable-logging enable-logging))
 
 (defun pose->trans (pose)
-  `(,(tf:x (tf:origin pose))
-    ,(tf:y (tf:origin pose))
-    ,(tf:z (tf:origin pose))))
+  `(,(cl-transforms:x (cl-transforms:origin pose))
+    ,(cl-transforms:y (cl-transforms:origin pose))
+    ,(cl-transforms:z (cl-transforms:origin pose))))
 
 (defun quaternion->rot (q)
-  `(,(tf:x q) ,(tf:y q) ,(tf:z q) ,(tf:w q)))
+  `(,(cl-transforms:x q) ,(cl-transforms:y q) ,(cl-transforms:z q) ,(cl-transforms:w q)))
 
 (defun pose->rot (pose)
-  (quaternion->rot (tf:orientation pose)))
+  (quaternion->rot (cl-transforms:orientation pose)))
 
 (defun get-robot-pose (&optional (frame-id "/base_link"))
   "Gets the current pose of the coordinate frame `frame-id' w.r.t. the
@@ -141,8 +141,8 @@ frame `/map'."
     *tf2*
     (cl-transforms-plugin:make-pose-stamped
      (cl-transforms:make-pose
-      (tf:make-identity-vector)
-      (tf:make-identity-rotation))
+      (cl-transforms:make-identity-vector)
+      (cl-transforms:make-identity-rotation))
      frame-id
      0.0)
     "/map"))
@@ -156,7 +156,7 @@ frame `/map'."
          (urdf-kitchen
            (cl-urdf:parse-urdf
             (roslisp:get-param "kitchen_description")))
-         (scene-rot (quaternion->rot (tf:euler->quaternion :az pi)))
+         (scene-rot (quaternion->rot (cl-transforms:euler->quaternion :az pi)))
          (scene-trans `(-3.45 -4.35 0))
          (robot-rot (pose->rot robot-pose))
          (robot-trans (pose->trans robot-pose)))
@@ -227,16 +227,16 @@ entity."
   "Publish the stamped pose `pose-stamped' onto topic `topic'. `topic'
 defaults to the topic `/object'."
   (let ((adv (roslisp:advertise topic "geometry_msgs/PoseStamped")))
-    (roslisp:publish adv (tf:pose-stamped->msg pose-stamped))))
+    (roslisp:publish adv (cl-transforms-plugin:pose-stamped->msg pose-stamped))))
 
 (defun move-arms-up (&key allowed-collision-objects side ignore-collisions)
   (when (or (eql side :left) (not side))
     (pr2-manip-pm::execute-move-arm-pose
      :left
      (cl-transforms-plugin:make-pose-stamped
-      (cl-tf:make-pose
-       (tf:make-3d-vector 0.3 0.5 1.3)
-       (tf:euler->quaternion :ax 0))
+      (cl-transforms:make-pose
+       (cl-transforms:make-3d-vector 0.3 0.5 1.3)
+       (cl-transforms:euler->quaternion :ax 0))
       "base_link" (roslisp:ros-time))
      :ignore-collisions ignore-collisions
      :allowed-collision-objects allowed-collision-objects))
@@ -244,9 +244,9 @@ defaults to the topic `/object'."
     (pr2-manip-pm::execute-move-arm-pose
      :right
      (cl-transforms-plugin:make-pose-stamped
-      (cl-tf:make-pose
-       (tf:make-3d-vector 0.3 -0.5 1.3)
-       (tf:euler->quaternion :ax 0))
+      (cl-transforms:make-pose
+       (cl-transforms:make-3d-vector 0.3 -0.5 1.3)
+       (cl-transforms:euler->quaternion :ax 0))
       "base_link" (roslisp:ros-time))
      :ignore-collisions ignore-collisions
      :allowed-collision-objects allowed-collision-objects)))
@@ -272,19 +272,19 @@ defaults to the topic `/object'."
                        (offset-angle 0.0)
                        grasp-type
                        (center-offset
-                        (tf:make-identity-vector)))
+                        (cl-transforms:make-identity-vector)))
   (loop for i from 0 below segments
         as current-angle = (+ (* 2 pi (float (/ i segments)))
                               offset-angle)
-        as handle-pose = (tf:make-pose
-                          (tf:make-3d-vector
+        as handle-pose = (:make-pose
+                          (cl-transforms:make-3d-vector
                            (+ (* distance-from-center (cos current-angle))
-                              (tf:x center-offset))
+                              (cl-transforms:x center-offset))
                            (+ (* distance-from-center (sin current-angle))
-                              (tf:y center-offset))
+                              (cl-transforms:y center-offset))
                            (+ 0.0
-                              (tf:z center-offset)))
-                          (tf:euler->quaternion
+                              (cl-transforms:z center-offset)))
+                          (cl-transforms:euler->quaternion
                            :ax ax :ay ay :az (+ az current-angle)))
         as handle-object = (make-designator
                             'cram-designators:object
@@ -461,14 +461,14 @@ throughout the demo experiment."
                      (cl-tf2:do-transform
                       *tf2* pose-stamped
                        (cl-tf2:get-frame-id solution))))
-               (<= (tf:v-dist (tf:make-3d-vector
-                               (tf:x (tf:origin pose-stamped-map))
-                               (tf:y (tf:origin pose-stamped-map))
-                               0.0)
-                              (tf:make-3d-vector
-                               (tf:x (tf:origin solution))
-                               (tf:y (tf:origin solution))
-                               0.0))
+               (<= (cl-transforms:v-dist (cl-transforms:make-3d-vector
+                                          (cl-transforms:x (cl-transforms:origin pose-stamped-map))
+                                          (cl-transforms:y (cl-transforms:origin pose-stamped-map))
+                                          0.0)
+                                         (cl-transforms:make-3d-vector
+                                          (cl-transforms:x (cl-transforms:origin solution))
+                                          (cl-transforms:y (cl-transforms:origin solution))
+                                          0.0))
                    threshold))))
     (cond ((or (eql (desig-prop-value
                      designator 'desig-props:in-front-of)
@@ -516,9 +516,9 @@ throughout the demo experiment."
 (defun look-at-marker-suitable-pose ()
   (achieve `(cram-plan-library:looking-at
              ,(cl-transforms-plugin:make-pose-stamped
-               (cl-tf:make-pose
-                (tf:make-3d-vector 1.0 0.0 1.0)
-                (tf:euler->quaternion))
+               (cl-transforms:make-pose
+                (cl-transforms:make-3d-vector 1.0 0.0 1.0)
+                (cl-transforms:euler->quaternion))
                "/base_link" 0.0))))
 
 (defun perceive-markers (demo-handle)
@@ -547,16 +547,16 @@ throughout the demo experiment."
                                                marker-id))
                         (marker-at (reference (desig-prop-value
                                                perceived-marker 'at))))
-                    (tf:pose->pose-stamped
-                     "/map" 0.0
+                    (cl-transforms-plugin:make-pose-stamped
                      (cl-transforms:transform-pose
-                      (tf:pose->transform marker-at)
+                      (cl-transforms:pose->transform marker-at)
                       (cl-transforms:transform-pose
-                       (tf:transform-inv
-                        (tf:pose->transform marker-relative-pose))
-                       (tf:transform->pose
-                        (tf:transform-inv (tf:pose->transform
-                                           relative-pose)))))))))))
+                       (cl-transforms:transform-inv
+                        (cl-transforms:pose->transform marker-relative-pose))
+                       (cl-transforms:transform->pose
+                        (cl-transforms:transform-inv (cl-transforms:pose->transform
+                                                      relative-pose)))))
+                     "/map" 0.0))))))
           perceived-markers))
 
 (defmacro with-logging-enabled (&body body)

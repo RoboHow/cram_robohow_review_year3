@@ -51,7 +51,7 @@
   
   (<- (make-handles ?distance-from-center ?segments ?offset-angle ?grasp-type
                     ?hand-ax ?hand-ay ?hand-az ?co-x ?co-y ?co-z ?handles)
-    (crs:lisp-fun tf:make-3d-vector ?co-x ?co-y ?co-z ?co)
+    (crs:lisp-fun cl-transforms:make-3d-vector ?co-x ?co-y ?co-z ?co)
     (crs:lisp-fun make-handles ?distance-from-center
                   :segments ?segments
                   :offset-angle ?offset-angle
