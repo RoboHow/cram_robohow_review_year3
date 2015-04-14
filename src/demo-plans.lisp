@@ -76,7 +76,7 @@
                  (markers-relative-pose->absolute-poses
                   demo-handle perceived-markers relative-pose)))
         (publish-pose (first (marker-relative-pose
-                              (tf:make-identity-pose)))
+                              (cl-transforms:make-identity-pose)))
                       "/marker")))))
 
 (def-cram-function track-human (demo-handle)
