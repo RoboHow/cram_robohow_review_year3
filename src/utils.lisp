@@ -276,7 +276,7 @@ defaults to the topic `/object'."
   (loop for i from 0 below segments
         as current-angle = (+ (* 2 pi (float (/ i segments)))
                               offset-angle)
-        as handle-pose = (:make-pose
+        as handle-pose = (cl-transforms:make-pose
                           (cl-transforms:make-3d-vector
                            (+ (* distance-from-center (cos current-angle))
                               (cl-transforms:x center-offset))
