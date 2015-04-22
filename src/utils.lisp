@@ -68,21 +68,21 @@
      (desig:make-designator
       'location
       `((desig-props::pose
-         ,(cl-transforms-plugin:make-pose-stamped
+         ,(cl-tf:pose->pose-stamped
+           "/map" 0.0
            (cl-transforms:make-pose
             (cl-transforms:make-3d-vector 0.538 1.9 0.0) ;;2.035
-            (cl-transforms:make-quaternion 0.0 0.0 0.0 -1.0))
-           "/map" 0.0))
+            (cl-transforms:make-quaternion 0.0 0.0 0.0 -1.0))))
         (desig-props:in-front-of desig-props:oven)))
      :loc-in-front-of-island
      (desig:make-designator
       'location
       `((desig-props::pose
-         ,(cl-transforms-plugin:make-pose-stamped
+         ,(cl-tf:pose->pose-stamped
+           "/map" 0.0
            (cl-transforms:make-pose
             (cl-transforms:make-3d-vector -0.323 1.437 0.0)
-            (cl-transforms:make-quaternion 0 0 1 0.03))
-           "/map" 0.0))
+            (cl-transforms:make-quaternion 0 0 1 0.03))))
         (desig-props:in-front-of desig-props:island)))
      :obj-tray (make-designator
                 'object `((type tray)
@@ -100,10 +100,22 @@
                               &key enable-logging)
   "Initializes the demo setup. `demo-handle' is an initialized
 instance of the demo variables, while `robot' is a symbol denoting
-either `PR2' or `Boxy', depending on which top-level plan called this
+either `:pr2' or `:boxy', depending on which top-level plan called this
 function. The parameter `enable-logging' either enables logging, or
 disables it (default)."
-  (declare (ignorable demo-handle robot))
+  (initialize-demo-setup-generic
+   demo-handle :enable-logging enable-logging)
+  (ecase robot
+    (:pr2 (ros-info (rh demo) "Initializing demo for PR2")
+     (initialize-demo-setup-pr2 demo-handle))
+    (:boxy (ros-info (rh demo) "Initializing demo for Boxy")
+     (initialize-demo-setup-boxy demo-handle)))
+  (moveit:clear-collision-environment)
+  (sem-map-coll-env:publish-semantic-map-collision-objects)
+  (beliefstate::enable-logging enable-logging))
+
+(defun initialize-demo-setup-generic (demo-handle &key enable-logging)
+  (declare (ignorable demo-handle enable-logging))
   ;; Register the location validation function that handles special
   ;; purpose locations for the demo
   (setf location-costmap::*fixed-frame* "/map")
@@ -117,11 +129,15 @@ disables it (default)."
   ;; Setting the timeout for action server responses to a high
   ;; value. Otherwise, the (very long, > 2.0 seconds) motion planning
   ;; process will just drop the connection and never execute.
-  (setf actionlib::*action-server-timeout* 20)
-  (initialize-bullet robot :debug-window t)
-  (moveit:clear-collision-environment)
-  (sem-map-coll-env:publish-semantic-map-collision-objects)
-  (beliefstate::enable-logging enable-logging))
+  (setf actionlib::*action-server-timeout* 20))
+
+(defun initialize-demo-setup-pr2 (demo-handle)
+  (declare (ignorable demo-handle))
+  (initialize-bullet :pr2 :debug-window t))
+
+(defun initialize-demo-setup-boxy (demo-handle)
+  (declare (ignorable demo-handle))
+  (initialize-bullet :boxy :debug-window t))
 
 (defun pose->trans (pose)
   `(,(cl-transforms:x (cl-transforms:origin pose))
@@ -137,14 +153,13 @@ disables it (default)."
 (defun get-robot-pose (&optional (frame-id "/base_link"))
   "Gets the current pose of the coordinate frame `frame-id' w.r.t. the
 frame `/map'."
-  (cl-tf2:do-transform
-    *tf2*
-    (cl-transforms-plugin:make-pose-stamped
+  (cl-tf2:ensure-pose-stamped-transformed
+    *tf*
+    (cl-tf:pose->pose-stamped
+     frame-id 0.0
      (cl-transforms:make-pose
       (cl-transforms:make-identity-vector)
-      (cl-transforms:make-identity-rotation))
-     frame-id
-     0.0)
+      (cl-transforms:make-identity-rotation)))
     "/map"))
 
 (defmethod initialize-bullet (robot &key debug-window)
@@ -227,27 +242,27 @@ entity."
   "Publish the stamped pose `pose-stamped' onto topic `topic'. `topic'
 defaults to the topic `/object'."
   (let ((adv (roslisp:advertise topic "geometry_msgs/PoseStamped")))
-    (roslisp:publish adv (cl-transforms-plugin:pose-stamped->msg pose-stamped))))
+    (roslisp:publish adv (cl-tf:pose-stamped->msg pose-stamped))))
 
 (defun move-arms-up (&key allowed-collision-objects side ignore-collisions)
   (when (or (eql side :left) (not side))
     (pr2-manip-pm::execute-move-arm-pose
      :left
-     (cl-transforms-plugin:make-pose-stamped
+     (cl-tf:pose->pose-stamped
+      "base_link" (roslisp:ros-time)
       (cl-transforms:make-pose
        (cl-transforms:make-3d-vector 0.3 0.5 1.3)
-       (cl-transforms:euler->quaternion :ax 0))
-      "base_link" (roslisp:ros-time))
+       (cl-transforms:euler->quaternion :ax 0)))
      :ignore-collisions ignore-collisions
      :allowed-collision-objects allowed-collision-objects))
   (when (or (eql side :right) (not side))
     (pr2-manip-pm::execute-move-arm-pose
      :right
-     (cl-transforms-plugin:make-pose-stamped
+     (cl-tf:pose->pose-stamped
+      "base_link" (roslisp:ros-time)
       (cl-transforms:make-pose
        (cl-transforms:make-3d-vector 0.3 -0.5 1.3)
-       (cl-transforms:euler->quaternion :ax 0))
-      "base_link" (roslisp:ros-time))
+       (cl-transforms:euler->quaternion :ax 0)))
      :ignore-collisions ignore-collisions
      :allowed-collision-objects allowed-collision-objects)))
 
@@ -458,9 +473,9 @@ throughout the demo experiment."
   (labels ((pose-within-distance (pose-stamped
                                   &optional (threshold 0.10))
              (let ((pose-stamped-map
-                     (cl-tf2:do-transform
-                      *tf2* pose-stamped
-                       (cl-tf2:get-frame-id solution))))
+                     (cl-tf2:ensure-pose-stamped-transformed
+                      *tf* pose-stamped
+                      (cl-tf:frame-id solution))))
                (<= (cl-transforms:v-dist (cl-transforms:make-3d-vector
                                           (cl-transforms:x (cl-transforms:origin pose-stamped-map))
                                           (cl-transforms:y (cl-transforms:origin pose-stamped-map))
@@ -515,11 +530,11 @@ throughout the demo experiment."
 
 (defun look-at-marker-suitable-pose ()
   (achieve `(cram-plan-library:looking-at
-             ,(cl-transforms-plugin:make-pose-stamped
+             ,(cl-tf:pose->pose-stamped
+               "/base_link" 0.0
                (cl-transforms:make-pose
                 (cl-transforms:make-3d-vector 1.0 0.0 1.0)
-                (cl-transforms:euler->quaternion))
-               "/base_link" 0.0))))
+                (cl-transforms:euler->quaternion))))))
 
 (defun perceive-markers (demo-handle)
   (perceive-all (dh-obj-marker demo-handle)
@@ -547,7 +562,8 @@ throughout the demo experiment."
                                                marker-id))
                         (marker-at (reference (desig-prop-value
                                                perceived-marker 'at))))
-                    (cl-transforms-plugin:make-pose-stamped
+                    (cl-tf:pose->pose-stamped
+                     "/map" 0.0
                      (cl-transforms:transform-pose
                       (cl-transforms:pose->transform marker-at)
                       (cl-transforms:transform-pose
@@ -555,8 +571,7 @@ throughout the demo experiment."
                         (cl-transforms:pose->transform marker-relative-pose))
                        (cl-transforms:transform->pose
                         (cl-transforms:transform-inv (cl-transforms:pose->transform
-                                                      relative-pose)))))
-                     "/map" 0.0))))))
+                                                      relative-pose)))))))))))
           perceived-markers))
 
 (defmacro with-logging-enabled (&body body)
