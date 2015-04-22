@@ -45,17 +45,18 @@
 (def-top-level-cram-function pizza-making-pr2 ()
   (with-process-modules-pr2
     (let ((dh (get-demo-handle)))
-      (initialize-demo-setup dh 'pr2)
+      (initialize-demo-setup dh :pr2)
       ;; TODO(all): Perform actual PR2 demo plans here
       ;; Do everything pizza-making related here before moving the tray
       (fetch-tray dh)
-      (shove-tray-into-oven dh)
+      ;(shove-tray-into-oven dh)
+      
       (destroy-demo-handle dh))))
 
 (def-top-level-cram-function pizza-making-boxy ()
   (with-process-modules-boxy
     (let ((dh (get-demo-handle)))
-      (initialize-demo-setup dh 'boxy)
+      (initialize-demo-setup dh :boxy)
       ;; TODO(all): Perform actual Boxy demo plans here
       (destroy-demo-handle dh))))
 
@@ -87,3 +88,4 @@
     (loop until (wait-for-kqml-message
                  demo-handle
                  'pr2 'boxy "tray appeared on kitchen_island"))))
+

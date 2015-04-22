@@ -37,7 +37,9 @@
   (loc-in-front-of-oven nil)
   (loc-in-front-of-island nil)
   (obj-tray nil)
-  (obj-marker nil))
+  (obj-marker nil)
+  (name-handle-drawer nil)
+  (name-handle-fridge nil))
 
 ;;;
 ;;; Helper functions
@@ -90,14 +92,15 @@
                                 'location
                                 `((on Cupboard)
                                   (name "kitchen_island"))))))
-     :obj-marker (make-designator 'object `((type armarker))))))
+     :obj-marker (make-designator 'object `((type armarker)))
+     :name-handle-drawer "drawer_sinkblock_upper_handle"
+     :name-handle-fridge "drawer_fridge_upper_handle")))
 
 (defun destroy-demo-handle (demo-handle)
   (roslisp:unsubscribe (dh-control-command-subscriber demo-handle))
   (roslisp:unadvertise "/demo_command"))
 
-(defun initialize-demo-setup (demo-handle robot
-                              &key enable-logging)
+(defun initialize-demo-setup (demo-handle robot &key enable-logging)
   "Initializes the demo setup. `demo-handle' is an initialized
 instance of the demo variables, while `robot' is a symbol denoting
 either `:pr2' or `:boxy', depending on which top-level plan called this
@@ -145,7 +148,10 @@ disables it (default)."
     ,(cl-transforms:z (cl-transforms:origin pose))))
 
 (defun quaternion->rot (q)
-  `(,(cl-transforms:x q) ,(cl-transforms:y q) ,(cl-transforms:z q) ,(cl-transforms:w q)))
+  `(,(cl-transforms:x q)
+    ,(cl-transforms:y q)
+    ,(cl-transforms:z q)
+    ,(cl-transforms:w q)))
 
 (defun pose->rot (pose)
   (quaternion->rot (cl-transforms:orientation pose)))
@@ -154,7 +160,7 @@ disables it (default)."
   "Gets the current pose of the coordinate frame `frame-id' w.r.t. the
 frame `/map'."
   (cl-tf2:ensure-pose-stamped-transformed
-    *tf*
+    *tf2*
     (cl-tf:pose->pose-stamped
      frame-id 0.0
      (cl-transforms:make-pose
@@ -334,26 +340,32 @@ defaults to the topic `/object'."
 
 (defun send-kqml (demo-handle sender receiver content
                               &optional in-reply-to)
-  (let ((command
-          (cond (in-reply-to
-                 (concatenate
-                  'string
-                  "reply :sender " sender " :receiver " receiver
-                  ":content " content ":in-reply-to " in-reply-to))
-                (t
-                 (concatenate
-                  'string
-                  "tell :sender " sender " :receiver " receiver
-                  ":content " content)))))
-    (send-control-command demo-handle command)))
+  (let ((kqml (cond (in-reply-to
+                     (make-instance
+                      'acl:kqml-performative-tell
+                      :sender sender
+                      :receiver receiver
+                      :content content))
+                    (t
+                     (make-instance
+                      'acl:kqml-performative-tell
+                      :sender sender
+                      :receiver receiver
+                      :content content
+                      :in-reply-to in-reply-to)))))
+    (send-control-command demo-handle (acl::kqml->string kqml))))
+
+(defun reply-to-kqml (demo-handle kqml content)
+  (send-kqml
+   demo-handle
+   (acl:receiver kqml)
+   (acl:sender kqml)
+   content
+   (acl:content kqml)))
 
 (defun wait-for-kqml (demo-handle)
   (let ((control-command (get-control-command demo-handle)))
-    ;; TODO(winkler): Split the string `control-command' here, check
-    ;; for primary expression (first word) and then split the
-    ;; `keyword' constructs after that (pairs of `:keyword
-    ;; value'). Then, return it as a hash table.
-    (make-hash-table)))
+    (acl::string->kqml control-command)))
 
 (defun wait-as-receiver (demo-handle receiver)
   (loop for kqml = (wait-for-kqml demo-handle)
@@ -474,7 +486,7 @@ throughout the demo experiment."
                                   &optional (threshold 0.10))
              (let ((pose-stamped-map
                      (cl-tf2:ensure-pose-stamped-transformed
-                      *tf* pose-stamped
+                      *tf2* pose-stamped
                       (cl-tf:frame-id solution))))
                (<= (cl-transforms:v-dist (cl-transforms:make-3d-vector
                                           (cl-transforms:x (cl-transforms:origin pose-stamped-map))
@@ -493,7 +505,8 @@ throughout the demo experiment."
                     'desig-props:island))
            (let ((pose (desig-prop-value designator 'desig-props:pose)))
              (when (and pose (pose-within-distance pose))
-               :accept))))))
+               :accept)))
+          (t :unknown))))
 
 ;; Location utility quick functions
 
@@ -523,6 +536,38 @@ throughout the demo experiment."
               :stationary t
               :move-head nil
               :equate t))
+
+;;;
+;;; Drawer and Fridge
+;;;
+
+(defun perceive-handle-drawer (demo-handle)
+  (let ((handles (perceive-all (make-designator
+                                'object
+                                `((desig-props:type
+                                   desig-props::semantic-handle)))
+                               :stationary t
+                               :move-head nil)))
+    (find (dh-name-handle-drawer demo-handle)
+          handles
+          :test
+          (lambda (name handle)
+            (string= (desig-prop-value handle 'desig-props:name)
+                     name)))))
+
+(defun perceive-handle-fridge (demo-handle)
+  (let ((handles (perceive-all (make-designator
+                                'object
+                                `((desig-props:type
+                                   desig-props::semantic-handle)))
+                               :stationary t
+                               :move-head nil)))
+    (find (dh-name-handle-fridge demo-handle)
+          handles
+          :test
+          (lambda (name handle)
+            (string= (desig-prop-value handle 'desig-props:name)
+                     name)))))
 
 ;;;
 ;;; Markers
