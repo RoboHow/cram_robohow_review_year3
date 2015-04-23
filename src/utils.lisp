@@ -83,11 +83,12 @@
          ,(cl-tf:pose->pose-stamped
            "/map" 0.0
            (cl-transforms:make-pose
-            (cl-transforms:make-3d-vector -0.323 1.437 0.0)
+            (cl-transforms:make-3d-vector -0.323 1.637 0.0)
             (cl-transforms:make-quaternion 0 0 1 0.03))))
         (desig-props:in-front-of desig-props:island)))
      :obj-tray (make-designator
                 'object `((type tray)
+                          (carry-handles 2)
                           (at ,(make-designator
                                 'location
                                 `((on Cupboard)
@@ -340,19 +341,20 @@ defaults to the topic `/object'."
 
 (defun send-kqml (demo-handle sender receiver content
                               &optional in-reply-to)
-  (let ((kqml (cond (in-reply-to
-                     (make-instance
-                      'acl:kqml-performative-tell
-                      :sender sender
-                      :receiver receiver
-                      :content content))
-                    (t
-                     (make-instance
-                      'acl:kqml-performative-tell
-                      :sender sender
-                      :receiver receiver
-                      :content content
-                      :in-reply-to in-reply-to)))))
+  (let* ((content (concatenate 'string "'" content "'"))
+         (kqml (cond (in-reply-to
+                      (make-instance
+                       'acl:kqml-performative-tell
+                       :sender sender
+                       :receiver receiver
+                       :content content))
+                     (t
+                      (make-instance
+                       'acl:kqml-performative-tell
+                       :sender sender
+                       :receiver receiver
+                       :content content
+                       :in-reply-to in-reply-to)))))
     (send-control-command demo-handle (acl::kqml->string kqml))))
 
 (defun reply-to-kqml (demo-handle kqml content)
@@ -369,15 +371,27 @@ defaults to the topic `/object'."
 
 (defun wait-as-receiver (demo-handle receiver)
   (loop for kqml = (wait-for-kqml demo-handle)
-        as is-ok = (not (and (string=
-                              (gethash "receiver" kqml)
-                              receiver)))
+        as is-ok = (string= (acl::receiver kqml)
+                            receiver)
         when is-ok
           do (return kqml)))
 
 ;;;
 ;;; Plan Macros
 ;;;
+
+(defmacro with-experiment-active (robot &body body)
+  (labels ((combine-symbols (symbols)
+             (intern (format nil "~{~a~}" symbols))))
+    (assert (or (eql robot :pr2) (eql robot :boxy)))
+    `(top-level
+       (,(combine-symbols `("WITH-PROCESS-MODULES-"
+                            ,(symbol-name robot)))
+        (let ((dh (get-demo-handle)))
+          (setf *dh* dh)
+          (initialize-demo-setup dh ,robot)
+          (prog1 (progn ,@body)
+            (destroy-demo-handle dh)))))))
 
 (defmacro ensure-results (function)
   `(loop for results = (funcall ,function)
@@ -532,10 +546,20 @@ throughout the demo experiment."
 ;;;
 
 (defun perceive-tray (demo-handle)
-  (perceive-a (dh-obj-tray demo-handle)
-              :stationary t
-              :move-head nil
-              :equate t))
+  (let ((trays (perceive-all (dh-obj-tray demo-handle)
+                             :stationary t
+                             :move-head nil)))
+    (labels ((area-of-object (object)
+               (let* ((segment (desig-prop-value object 'segment))
+                      (dimensions-2d (cadr (assoc 'dimensions-2d segment))))
+                 (* (elt dimensions-2d 0) (elt dimensions-2d 1)))))
+      (let ((tray
+              (find (loop for tray in trays
+                          maximizing (area-of-object tray))
+                    trays :test (lambda (area object)
+                                  (equal area (area-of-object object))))))
+        (when tray
+          (equate (dh-obj-tray demo-handle) tray))))))
 
 ;;;
 ;;; Drawer and Fridge
@@ -635,9 +659,23 @@ throughout the demo experiment."
   (declare (ignore demo-handle sender receiver content))
   (ros-error (demo) "IMPLEMENT ME: `wait-for-kqml-message'"))
 
-(defun wait-for-human-near-oven (demo-handle)
-  (declare (ignore demo-handle))
-  (ros-error (demo) "IMPLEMENT ME: `wait-for-human-near-oven'"))
+(defun human-tracking (demo-handle)
+  (send-kqml demo-handle "Boxy" "*" "I am waiting for a human in the scene now.")
+  (wait-for-human-in-scene demo-handle)
+  (send-kqml demo-handle "Boxy" "*" "A human entered the scene.")
+  (wait-while-human-in-scene demo-handle)
+  (send-kqml demo-handle "Boxy" "*" "The human left the scene again.")
+  (send-kqml demo-handle "Boxy" "PR2" "Come back to the table.")
+  (reply-to-kqml
+   demo-handle
+   (wait-for-kqml-message demo-handle "PR2" "Boxy" "I am back.")
+   "Welcome back."))
+
+(defun wait-for-human-in-scene (demo-handle)
+  (perceive-tracked-human demo-handle))
+ 
+(defun wait-while-human-in-scene (demo-handle)
+  (loop while (is-human-in-scene demo-handle)))
 
 (defun is-message-on-topic (demo-handle topic topic-type)
   (declare (ignore demo-handle))
@@ -648,12 +686,15 @@ throughout the demo experiment."
       (let ((subscriber (roslisp:subscribe
                          topic topic-type
                          #'message-function)))
-        (sleep 0.5)
+        (sleep 1.0)
         (roslisp:unsubscribe subscriber)
         message-present))))
 
+(defun is-human-in-scene (demo-handle)
+  (is-message-on-topic
+   demo-handle
+   "/RoboSherlock_jworch/person"
+   "person_msgs/Person"))
+
 (defun perceive-tracked-human (demo-handle)
-  (loop until (is-message-on-topic
-               demo-handle
-               "/RoboSherlock_jworch/person"
-               "person_msgs/Person")))
+  (loop until (is-human-in-scene demo-handle)))

@@ -50,7 +50,7 @@
       ;; Do everything pizza-making related here before moving the tray
       (fetch-tray dh)
       ;(shove-tray-into-oven dh)
-      
+      (send-kqml dh "PR2" "Boxy" "tray placed in oven")
       (destroy-demo-handle dh))))
 
 (def-top-level-cram-function pizza-making-boxy ()
@@ -58,6 +58,7 @@
     (let ((dh (get-demo-handle)))
       (initialize-demo-setup dh :boxy)
       ;; TODO(all): Perform actual Boxy demo plans here
+      (human-tracking) ;; This happens after everything else and triggers tracking of the human. It automatically waits for the PR2 to report that the tray was shoven into the oven.
       (destroy-demo-handle dh))))
 
 (def-cram-function fetch-tray (demo-handle)
@@ -81,11 +82,17 @@
                       "/marker")))))
 
 (def-cram-function track-human (demo-handle)
-  (wait-for-kqml-message demo-handle 'pr2 'boxy "tray placed in oven")
+  (wait-for-kqml-message
+   demo-handle "PR2" "Boxy" "tray placed in oven")
   (with-logging-disabled
     (perceive-tracked-human demo-handle))
   (with-logging-enabled
     (loop until (wait-for-kqml-message
                  demo-handle
-                 'pr2 'boxy "tray appeared on kitchen_island"))))
+                 "PR2" "Boxy" "tray appeared on kitchen_island"))))
 
+(def-cram-function wait-for-orders-after-human-tracking (demo-handle)
+  (let ((kqml (wait-for-kqml-message
+               demo-handle "Boxy" "PR2" "Come back to the table.")))
+    (in-front-of-island demo-handle
+      (reply-to-kqml demo-handle kqml "I am back."))))

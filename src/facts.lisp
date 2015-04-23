@@ -82,9 +82,9 @@
     (make-handles 0.18 2 0 desig-props:push ?pi ?tilt2
                   0.0 0.0 0.0 0.0 ?handles-list))
   
-  (<- (infer-object-property ?object desig-props:carry-handles ?carry-handles)
-    (infer-object-property ?object desig-props:type ?type)
-    (object-carry-handles ?type ?carry-handles))
-  
   ;; Tray: Carry with 2 arms
-  (<- (object-carry-handles desig-props:tray 2)))
+  (<- (object-carry-handles desig-props:tray 2))
+  
+  (<- (infer-object-property ?object desig-props:carry-handles ?carry-handles)
+    (desig-prop ?object (type ?type))
+    (object-carry-handles ?type ?carry-handles)))
