@@ -13,6 +13,7 @@
   
   <run_depend>cram_rhy3_pickandplace_demo</run_depend>
   <run_depend>cram_rhy3_rolling_demo</run_depend>
+  <run_depend>robosherlock_mini_process_module</run_depend>
   
   <export>
    <metapackage/>
