@@ -37,8 +37,6 @@
         #:designators-ros)
   (:import-from #:cram-roslisp-common *tf2*)
   (:import-from #:cram-reasoning #:<- #:def-fact-group)
-  (:import-from #:cram-manipulation-knowledge
-                trajectory-point end-effector-link)
   (:export robosherlock-mini-process-module
            infer-object-property
            perceived-object-invalid
