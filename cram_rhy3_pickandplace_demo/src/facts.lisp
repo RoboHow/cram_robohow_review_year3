@@ -26,13 +26,44 @@
 ;;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ;;; POSSIBILITY OF SUCH DAMAGE.
 
-(in-package :cram-robohow-review-year3)
+(in-package :cram-rhy3-pickandplace-demo)
 
 (defun object-color (colors color)
   (let ((color-pair (find color colors :test (lambda (x y) (eql x (car y))))))
     (if color-pair
         (cadr color-pair)
         0.0d0)))
+
+(defun make-area-restriction-cost-function ()
+  (let ((min-x -1.0)
+        (max-x 1.5)
+        (min-y 0.5)
+        (max-y 1.7))
+    (lambda (x y)
+      (if (and (>= x min-x)
+               (<= x max-x)
+               (>= y min-y)
+               (<= y max-y))
+          (if (> x 0.25)
+              (if (< y 1.0)
+                  1.0d0
+                  0.0d0)
+              1.0d0)
+          0.0d0))))
+
+(defmethod costmap-generator-name->score ((name (common-lisp:eql 'area-restriction-distribution2)))
+  77)
+
+(def-fact-group demo-costmap-desigs-area-restriction (desig-costmap)
+
+  (<- (desig-costmap ?desig ?cm)
+    (or (desig-prop ?desig (desig-props:to desig-props:see))
+        (desig-prop ?desig (desig-props:to desig-props:reach))
+        (desig-prop ?desig (desig-props:on ?_)))
+    (costmap ?cm)
+    (costmap-add-function area-restriction-distribution2
+                          (make-area-restriction-cost-function)
+                          ?cm)))
 
 (def-fact-group object-refinement-facts (infer-object-property
                                          object-handle
@@ -66,6 +97,10 @@
     (object-color ?object desig-props:black ?black)
     (> ?black 0.7))
   
+  (<- (infer-object-property ?object desig-props:type desig-props:spoon)
+    (desig-prop ?object (desig-props:response ?response))
+    (crs:lisp-pred string= ?response "spoon"))
+  
   (<- (infer-object-property ?object desig-props:handle ?handle)
     (crs:once
      (or (desig-prop ?object (desig-props:type ?type))
@@ -81,6 +116,14 @@
     (crs:lisp-fun / ?pi 2 ?pi-half)
     (make-handles 0.18 2 0 desig-props:push ?pi ?tilt2
                   0.0 0.0 0.0 0.0 ?handles-list))
+  
+  (<- (object-handle desig-props:spoon ?handles-list)
+    (symbol-value pi ?pi)
+    (crs:lisp-fun / ?pi 2 ?pi-half)
+    (crs:lisp-fun / ?pi -2 ?minus-pi-half)
+    (make-handles 0.0 1 0 desig-props:push
+                  ?pi-half ?minus-pi-half 0.0
+                  0.0 0.0 -0.0 ?handles-list))
   
   ;; Tray: Carry with 2 arms
   (<- (object-carry-handles desig-props:tray 2))

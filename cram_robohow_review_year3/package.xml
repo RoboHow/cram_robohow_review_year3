@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<package>
+  <name>cram_robohow_review_year3</name>
+  <version>0.0.1</version>
+  <description>RoboHow Demo Packages Year 3</description>
+  
+  <author>IAI Robotics Group</author>
+  <maintainer email="ai-robotics@cs.uni-bremen.de">AI Robotics</maintainer>
+  
+  <license>BSD</license>
+  
+  <buildtool_depend>catkin</buildtool_depend>
+  
+  <run_depend>cram_rhy3_pickandplace_demo</run_depend>
+  <run_depend>cram_rhy3_rolling_demo</run_depend>
+  
+  <export>
+   <metapackage/>
+  </export>
+</package>

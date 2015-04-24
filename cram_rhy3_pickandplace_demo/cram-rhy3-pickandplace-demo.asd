@@ -26,13 +26,13 @@
 ;;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ;;; POSSIBILITY OF SUCH DAMAGE.
 
-(asdf:defsystem cram-robohow-review-year3
-  :name "cram-robohow-review-year3"
+(asdf:defsystem cram-rhy3-pickandplace-demo
+  :name "cram-rhy3-pickandplace-demo"
   :author "Jan Winkler <winkler@cs.uni-bremen.de>"
   :version "0.1"
   :maintainer "Jan Winkler <winkler@cs.uni-bremen.de>"
   :licence "BSD"
-  :description "CRAM code for RoboHow Year 3 review"
+  :description "CRAM code for RoboHow Year 3 review pick and place demo"
   :depends-on (roslisp
                cl-tf2
                cram-roslisp-common

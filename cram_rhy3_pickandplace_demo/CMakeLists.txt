@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(cram_robohow_review_year3)
+project(cram_rhy3_pickandplace_demo)
 
 find_package(catkin REQUIRED COMPONENTS
   alexandria

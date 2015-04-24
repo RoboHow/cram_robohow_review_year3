@@ -28,7 +28,7 @@
 
 (in-package :cl-user)
 
-(desig-props:def-desig-package cram-robohow-review-year3
+(desig-props:def-desig-package cram-rhy3-pickandplace-demo
   (:use #:common-lisp #:roslisp #:cram-utilities #:designators-ros
         #:cram-roslisp-common #:cram-designators #:location-costmap
         #:cram-plan-knowledge #:cram-plan-library)
@@ -65,4 +65,4 @@
                      #:grasp-type #:black #:yellow #:white #:grey #:red
                      #:blu #:cyan #:magenta #:green #:timestamp
                      #:plane-distance #:segment #:dimensions-2d #:on
-                     #:name))
+                     #:name #:response #:spoon))

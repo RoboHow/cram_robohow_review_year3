@@ -26,7 +26,7 @@
 ;;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ;;; POSSIBILITY OF SUCH DAMAGE.
 
-(in-package :cram-robohow-review-year3)
+(in-package :cram-rhy3-pickandplace-demo)
 
 (defstruct (demo-handle (:conc-name dh-))
   (control-command-subscriber nil)
@@ -38,6 +38,7 @@
   (loc-in-front-of-island nil)
   (obj-tray nil)
   (obj-marker nil)
+  (obj-spoon nil)
   (name-handle-drawer nil)
   (name-handle-fridge nil))
 
@@ -93,6 +94,7 @@
                                 'location
                                 `((on Cupboard)
                                   (name "kitchen_island"))))))
+     :obj-spoon (make-designator 'object `((type spoon)))
      :obj-marker (make-designator 'object `((type armarker)))
      :name-handle-drawer "drawer_sinkblock_upper_handle"
      :name-handle-fridge "drawer_fridge_upper_handle")))
@@ -339,9 +341,16 @@ defaults to the topic `/object'."
   (roslisp:publish (dh-control-command-publisher demo-handle)
                    (make-message "std_msgs/String" :data command)))
 
+(define-hook cram-language::on-begin-speech-act
+    (sender receiver content in-reply-to))
+(define-hook cram-language::on-finish-speech-act
+    (id))
+
 (defun send-kqml (demo-handle sender receiver content
                               &optional in-reply-to)
-  (let* ((content (concatenate 'string "'" content "'"))
+  (let* ((log-id (first (cram-language::on-begin-speech-act
+                         sender receiver content in-reply-to)))
+         (content (concatenate 'string "'" content "'"))
          (kqml (cond (in-reply-to
                       (make-instance
                        'acl:kqml-performative-tell
@@ -355,7 +364,8 @@ defaults to the topic `/object'."
                        :receiver receiver
                        :content content
                        :in-reply-to in-reply-to)))))
-    (send-control-command demo-handle (acl::kqml->string kqml))))
+    (send-control-command demo-handle (acl::kqml->string kqml))
+    (cram-language::on-finish-speech-act log-id)))
 
 (defun reply-to-kqml (demo-handle kqml content)
   (send-kqml
@@ -398,32 +408,32 @@ defaults to the topic `/object'."
          while (not results)
          finally (return results)))
 
-(defmacro perceive-a (object &key stationary (move-head t) equate)
-  `(let ((perceived-object
-           (cpl:with-failure-handling
-               ((cram-plan-failures:object-not-found (f)
-                  (declare (ignore f))
-                  (ros-warn
-                   (longterm) "Object not found. Retrying.")
-                  (cpl:retry)))
-             (cond (,stationary
-                    (let ((at (desig-prop-value
-                               ,object 'desig-props:at)))
-                      (when ,move-head
-                        (achieve `(cram-plan-library:looking-at
-                                   ,(reference at))))
-                      (first (perceive-object
-                              'cram-plan-library:currently-visible
-                              ,object))))
-                   (t (cpl:with-failure-handling
-                          ((cram-plan-failures:location-not-reached-failure (f)
-                             (declare (ignore f))
-                             (cpl:retry)))
-                        (perceive-object 'cram-plan-library:a
-                                         ,object)))))))
-     (when ,equate
-       (equate ,object perceived-object))
-     perceived-object))
+(defun perceive-a (object &key stationary (move-head t) equate)
+  (let ((perceived-object
+          (cpl:with-failure-handling
+              ((cram-plan-failures:object-not-found (f)
+                 (declare (ignore f))
+                 (ros-warn
+                  (longterm) "Object not found. Retrying.")
+                 (cpl:retry)))
+            (cond (stationary
+                   (let ((at (desig-prop-value
+                              object 'desig-props:at)))
+                     (when move-head
+                       (achieve `(cram-plan-library:looking-at
+                                  ,(reference at))))
+                     (first (perceive-object
+                             'cram-plan-library:currently-visible
+                             object))))
+                  (t (cpl:with-failure-handling
+                         ((cram-plan-failures:location-not-reached-failure (f)
+                            (declare (ignore f))
+                            (cpl:retry)))
+                       (perceive-object 'cram-plan-library:a
+                                        object)))))))
+    (when equate
+      (equate object perceived-object))
+    perceived-object))
 
 (defmacro perceive-all (object &key stationary (move-head t))
   `(cpl:with-failure-handling
@@ -540,6 +550,15 @@ throughout the demo experiment."
 (defmacro in-front-of-island (demo-handle &body body)
   `(in-front-of (dh-loc-in-front-of-island ,demo-handle) t
      ,@body))
+
+;;;
+;;; Spoon
+;;;
+
+(defun perceive-spoon (demo-handle)
+  (perceive-a (dh-obj-spoon demo-handle)
+              :stationary t
+              :move-head nil))
 
 ;;;
 ;;; Tray
@@ -668,7 +687,7 @@ throughout the demo experiment."
   (send-kqml demo-handle "Boxy" "PR2" "Come back to the table.")
   (reply-to-kqml
    demo-handle
-   (wait-for-kqml-message demo-handle "PR2" "Boxy" "I am back.")
+   (wait-as-receiver demo-handle "Boxy")
    "Welcome back."))
 
 (defun wait-for-human-in-scene (demo-handle)

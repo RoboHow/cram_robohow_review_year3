@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package>
-  <name>cram_robohow_review_year3</name>
+  <name>cram_rhy3_pickandplace_demo</name>
   <version>0.0.0</version>
   <description>
     Package holding demo specific code for the RoboHow Review Year 3

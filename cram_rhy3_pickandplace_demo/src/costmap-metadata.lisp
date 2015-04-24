@@ -25,7 +25,7 @@
 ;;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ;;; POSSIBILITY OF SUCH DAMAGE.
 
-(in-package :cram-robohow-review-year3)
+(in-package :cram-rhy3-pickandplace-demo)
 
 (def-fact-group costmap-metadata (desig-loc)
 
