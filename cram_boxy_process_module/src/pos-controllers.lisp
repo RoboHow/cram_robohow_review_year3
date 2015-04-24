@@ -9,7 +9,7 @@
 ;;;     * Redistributions in binary form must reproduce the above copyright
 ;;;       notice, this list of conditions and the following disclaimer in the
 ;;;       documentation and/or other materials provided with the distribution.
-;;;     * Neither the name of Universität Bremen, nor the names of its
+;;;     * Neither the name or Universitaet Bremen nor the names of its
 ;;;       contributors may be used to endorse or promote products derived from
 ;;;       this software without specific prior written permission.
 ;;; 
@@ -25,22 +25,42 @@
 ;;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ;;; POSSIBILITY OF SUCH DAMAGE.
 
-(defsystem cram-boxy-process-module
-  :author "Georg Bartels <georg.bartels@cs.uni-bremen.de"
-  :license "BSD"
-  :description ""
-  
-  :depends-on (roslisp
-               actionlib-lisp
-               alexandria
-               process-modules
-               designators
-               cram-language
-               cram-plan-failures
-               controller_manager_msgs-srv
-               control_msgs-msg)
-  :components
-  ((:file "package")
-   (:file "controller-manager" :depends-on ("package"))
-   (:file "pos-controllers" :depends-on ("package"))
-   (:file "process-module" :depends-on ("package"))))
+(in-package :boxy-pm)
+
+;; (defparameter *right-arm-home-config*
+;;   (list -0.364994078874588 -0.2963586449623108 1.446787714958191 1.4938795566558838
+;;         1.8305927515029907 1.9798997640609741 0.7551921010017395))
+
+(defun move-arm-config (arm joint-names goal-config execution-time)
+  (actionlib-lisp:send-goal-and-wait 
+   arm
+   (actionlib-lisp:make-action-goal-msg arm
+     :trajectory (make-trajectory-msg joint-names goal-config execution-time))
+   (+ execution-time 1.0)
+   1.0))
+
+(defun get-right-arm-joint-names ()
+  (list "right_arm_0_joint" "right_arm_1_joint" "right_arm_2_joint" "right_arm_3_joint"
+        "right_arm_4_joint" "right_arm_5_joint" "right_arm_6_joint"))
+
+(defun get-left-arm-joint-names ()
+  (list "left_arm_0_joint" "left_arm_1_joint" "left_arm_2_joint" "left_arm_3_joint"
+        "left_arm_4_joint" "left_arm_5_joint" "left_arm_6_joint"))
+
+;;;
+;;; INTERNAL API
+;;;
+
+(defun make-trajectory-msg (joint-names goal-config execution-time)
+  (make-msg
+   "trajectory_msgs/JointTrajectory"
+   :header (make-msg "std_msgs/Header" :stamp (ros-time))
+   :joint_names (coerce joint-names 'vector)
+   :points (coerce (list (make-trajectory-point goal-config execution-time)) 'vector)))
+
+
+(defun make-trajectory-point (goal-config execution-time)
+  (roslisp:make-msg 
+   "trajectory_msgs/JointTrajectoryPoint"
+   :positions (coerce goal-config 'vector)
+   :time_from_start execution-time))

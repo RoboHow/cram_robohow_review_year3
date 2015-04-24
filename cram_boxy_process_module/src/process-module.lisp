@@ -28,20 +28,25 @@
 (in-package :boxy-pm)
 
 (defstruct (boxy-pm-handle (:conc-name boxy-))
-  (controller-manager nil))
+  (controller-manager nil)
+  (right-arm nil))
 
 (defun init-boxy-pm-handle ()
   (let ((controller-manager
           (make-instance
            'persistent-service
            :service-name "/controller_manager/switch_controller"
-           :service-type "controller_manager_msgs/SwitchController")
-          ))
-    (make-boxy-pm-handle :controller-manager controller-manager)))
+           :service-type "controller_manager_msgs/SwitchController"))
+        (right-arm
+          (actionlib-lisp:make-simple-action-client
+           "/r_arm_traj_controller/follow_joint_trajectory"
+           "control_msgs/FollowJointTrajectoryAction")))
+    (make-boxy-pm-handle :controller-manager controller-manager
+                         :right-arm right-arm)))
 
 (defun cleanup-boxy-pm-handle (handle)
   (close-persistent-service (boxy-controller-manager handle)))
-(defun enable-
+
 (defgeneric call-action (action &rest params))
 
 (defmacro def-action-handler (name args &body body)
