@@ -1,0 +1,11 @@
+(progn
+  (roslisp:start-ros-node "foo")
+  (cram-uima:init-uima-bridge)
+  (cpl:top-level
+    (cpm:with-process-modules-running
+        (robosherlock-mini-process-module:robosherlock-mini-process-module)
+      (let* ((obj (make-designator 'object `((type bowl))))
+             (act (make-designator 'action `((desig-props::to
+                                              desig-props::perceive)
+                                             (desig-props::obj ,obj)))))
+        (plan-lib:perform act)))))
