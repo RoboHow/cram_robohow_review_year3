@@ -34,7 +34,6 @@
                alexandria
                process-modules
                designators
-               bullet-reasoning
                cram-roslisp-common
                cram-language
                cram-plan-failures
