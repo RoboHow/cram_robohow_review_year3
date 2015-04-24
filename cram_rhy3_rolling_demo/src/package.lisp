@@ -27,14 +27,5 @@
 
 (in-package :cl-user)
 
-(desig-props:def-desig-package cram-boxy-process-module
-  (:nicknames boxy-pm)
-  (:use #:common-lisp
-        #:roslisp
-        #:cram-process-modules
-        #:desig)
-  (:import-from #:cram-reasoning #:<- #:def-fact-group)
-  (:export boxy-process-module init-boxy-pm-handle cleanup-boxy-pm-handle
-           boxy-pm-handle boxy-controller-manager boxy-right-arm
-           stop-controllers ensure-vel-controllers ensure-pos-controllers
-           move-arm-config get-right-arm-joint-names get-left-arm-joint-names))
+(defpackage cram-rolling-demo
+  (:use #:common-lisp #:roslisp))

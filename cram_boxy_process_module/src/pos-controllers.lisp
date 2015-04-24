@@ -27,10 +27,6 @@
 
 (in-package :boxy-pm)
 
-;; (defparameter *right-arm-home-config*
-;;   (list -0.364994078874588 -0.2963586449623108 1.446787714958191 1.4938795566558838
-;;         1.8305927515029907 1.9798997640609741 0.7551921010017395))
-
 (defun move-arm-config (arm joint-names goal-config execution-time)
   (actionlib-lisp:send-goal-and-wait 
    arm
@@ -57,7 +53,6 @@
    :header (make-msg "std_msgs/Header" :stamp (ros-time))
    :joint_names (coerce joint-names 'vector)
    :points (coerce (list (make-trajectory-point goal-config execution-time)) 'vector)))
-
 
 (defun make-trajectory-point (goal-config execution-time)
   (roslisp:make-msg 

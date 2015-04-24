@@ -25,16 +25,16 @@
 ;;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ;;; POSSIBILITY OF SUCH DAMAGE.
 
-(in-package :cl-user)
-
-(desig-props:def-desig-package cram-boxy-process-module
-  (:nicknames boxy-pm)
-  (:use #:common-lisp
-        #:roslisp
-        #:cram-process-modules
-        #:desig)
-  (:import-from #:cram-reasoning #:<- #:def-fact-group)
-  (:export boxy-process-module init-boxy-pm-handle cleanup-boxy-pm-handle
-           boxy-pm-handle boxy-controller-manager boxy-right-arm
-           stop-controllers ensure-vel-controllers ensure-pos-controllers
-           move-arm-config get-right-arm-joint-names get-left-arm-joint-names))
+(defsystem cram-rolling-demo
+  :author "Georg Bartels <georg.bartels@cs.uni-bremen.de"
+  :license "BSD"
+  :description ""
+  
+  :depends-on (roslisp
+               actionlib-lisp
+               cram-boxy-process-module
+               lasa_perception_module-srv
+               lasa_action_planners-msg)
+  :components
+  ((:file "package")
+   (:file "demo-handle" :depends-on ("package"))))

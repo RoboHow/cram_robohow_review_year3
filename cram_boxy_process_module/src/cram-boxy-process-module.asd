@@ -38,6 +38,7 @@
                cram-language
                cram-plan-failures
                controller_manager_msgs-srv
+               controller_manager_msgs-msg
                control_msgs-msg)
   :components
   ((:file "package")
