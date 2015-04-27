@@ -109,19 +109,24 @@ instance of the demo variables, while `robot' is a symbol denoting
 either `:pr2' or `:boxy', depending on which top-level plan called this
 function. The parameter `enable-logging' either enables logging, or
 disables it (default)."
-  (initialize-demo-setup-generic
-   demo-handle :enable-logging enable-logging)
+  (initialize-demo-setup-generic demo-handle)
   (ecase robot
     (:pr2 (ros-info (rh demo) "Initializing demo for PR2")
      (initialize-demo-setup-pr2 demo-handle))
     (:boxy (ros-info (rh demo) "Initializing demo for Boxy")
      (initialize-demo-setup-boxy demo-handle)))
-  (moveit:clear-collision-environment)
-  (sem-map-coll-env:publish-semantic-map-collision-objects)
   (beliefstate::enable-logging enable-logging))
 
-(defun initialize-demo-setup-generic (demo-handle &key enable-logging)
-  (declare (ignorable demo-handle enable-logging))
+(defun initialize-demo-setup-generic (demo-handle)
+  (declare (ignorable demo-handle))
+  (cram-uima::config-uima)
+  ;; Setting the timeout for action server responses to a high
+  ;; value. Otherwise, the (very long, > 2.0 seconds) motion planning
+  ;; process will just drop the connection and never execute.
+  (setf actionlib::*action-server-timeout* 20))
+
+(defun initialize-demo-setup-pr2 (demo-handle)
+  (declare (ignorable demo-handle))
   ;; Register the location validation function that handles special
   ;; purpose locations for the demo
   (setf location-costmap::*fixed-frame* "/map")
@@ -131,19 +136,13 @@ disables it (default)."
    'bullet-reasoning-designators::check-ik-solution)
   (cram-designators:disable-location-validation-function
    'bullet-reasoning-designators::validate-designator-solution)
-  (cram-uima::config-uima)
-  ;; Setting the timeout for action server responses to a high
-  ;; value. Otherwise, the (very long, > 2.0 seconds) motion planning
-  ;; process will just drop the connection and never execute.
-  (setf actionlib::*action-server-timeout* 20))
-
-(defun initialize-demo-setup-pr2 (demo-handle)
-  (declare (ignorable demo-handle))
-  (initialize-bullet :pr2 :debug-window t))
+  ;; kick bullet, moveit, and semantic maps
+  (initialize-bullet :pr2 :debug-window t)
+  (moveit:clear-collision-environment)
+  (sem-map-coll-env:publish-semantic-map-collision-objects))
 
 (defun initialize-demo-setup-boxy (demo-handle)
-  (declare (ignorable demo-handle))
-  (initialize-bullet :boxy :debug-window t))
+  (declare (ignorable demo-handle)))
 
 (defun pose->trans (pose)
   `(,(cl-transforms:x (cl-transforms:origin pose))
