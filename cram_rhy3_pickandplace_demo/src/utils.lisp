@@ -224,7 +224,7 @@ PR2."
   "Register and start all process modules necessary for operatinxg
 Boxy."
   `(cpm:with-process-modules-running
-       ()
+       (robosherlock-mini-pm:robosherlock-mini-process-module)
      ,@body))
 
 (defmacro try-n-times (n &body body)

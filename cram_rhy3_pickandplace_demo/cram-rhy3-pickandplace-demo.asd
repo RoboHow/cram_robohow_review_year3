@@ -57,6 +57,7 @@
                cram-language
                bullet-reasoning-designators
                robosherlock-process-module
+               robosherlock-mini-process-module
                designator_integration_msgs-msg
                designator_integration_msgs-srv
                cram-beliefstate
