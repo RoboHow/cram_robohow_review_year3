@@ -77,26 +77,41 @@
     `(defmethod call-action ((,action-sym (eql ',name)) &rest ,params)
        (destructuring-bind ,args ,params ,@body))))
 
-(def-action-handler home (arm)
-  (ros-info (perception) "Homing ~a arm" arm)
-  ;;TODO(Georg): implement me
-)
+(def-action-handler arm-joint-move (side config &optional (time 5.0))
+  (ros-info (boxy-pm) "Moving ~a arm to config: ~a" side config)
+  (let* ((handle (get-boxy-pm-handle))
+         (controller (ecase side
+                       (:left (boxy-left-arm handle))
+                       (:right (boxy-right-arm handle))))
+         (joint-names (ecase side
+                        (:left (get-left-arm-joint-names))
+                        (:right (get-right-arm-joint-names)))))
+    (ensure-pos-controllers (boxy-controller-manager handle))
+    (move-arm-config controller joint-names config time))
+  (ros-info (boxy-pm) "Moving done."))
 
 (def-process-module boxy-process-module (desig)
   (apply #'call-action (reference desig)))
 
 (def-fact-group boxy-pm-action-designators (action-desig)
 
-  (<- (action-desig ?designator (home ?side))
-    (action-desig? ?designator)
-    (desig-prop ?designator (:to :home))
-    (desig-prop ?designator (:arm ?side))))
-
+  (<- (action-desig ?designator (arm-joint-move ?side ?config))
+    (desig::action-desig? ?designator)
+    (desig-prop ?designator (:to :move))
+    (desig-prop ?designator (:arm ?side))
+    (desig-prop ?designator (:config ?config))))
 
 (def-fact-group boxy-process-module (matching-process-module available-process-module)
 
-  (<- (matching-process-module ?designator robosherlock-mini-process-module)
-    (or (desig-prop ?designator (:to :home))))
-
+  (<- (matching-process-module ?designator boxy-process-module)
+    (or (format "2")
+        (desig-prop ?designator (:to :home))
+        (format "3")
+        (desig-prop ?designator (:arm ?_))
+        (format "4")
+        (desig-prop ?designator (:config ?_)
+                    )
+        (format "5")))
+                     
   (<- (available-process-module boxy-process-module)
     (crs:true)))
