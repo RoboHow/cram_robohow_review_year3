@@ -39,9 +39,11 @@
                cram-plan-failures
                controller_manager_msgs-srv
                controller_manager_msgs-msg
-               control_msgs-msg)
+               control_msgs-msg
+               topic_tools-srv)
   :components
   ((:file "package")
    (:file "controller-manager" :depends-on ("package"))
    (:file "pos-controllers" :depends-on ("package"))
-   (:file "process-module" :depends-on ("package"))))
+   (:file "vel-mux" :depends-on ("package"))
+   (:file "process-module" :depends-on ("package" "vel-mux"))))

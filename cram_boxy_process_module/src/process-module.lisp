@@ -27,22 +27,45 @@
 
 (in-package :boxy-pm)
 
+(defparameter *boxy-pm-handle* nil)
+
 (defstruct (boxy-pm-handle (:conc-name boxy-))
   (controller-manager nil)
-  (right-arm nil))
-
+  (right-arm nil)
+  (left-arm nil)
+  (left-arm-vel-mux nil)
+  (right-arm-vel-mux nil))
+  
 (defun init-boxy-pm-handle ()
   (let ((controller-manager
           (make-instance
            'persistent-service
            :service-name "/controller_manager/switch_controller"
            :service-type "controller_manager_msgs/SwitchController"))
-        (right-arm
+        (right-arm-joint-controller
           (actionlib-lisp:make-simple-action-client
            "/r_arm_traj_controller/follow_joint_trajectory"
-           "control_msgs/FollowJointTrajectoryAction")))
+           "control_msgs/FollowJointTrajectoryAction"))
+        (left-arm-joint-controller
+          (actionlib-lisp:make-simple-action-client
+           "/r_arm_traj_controller/follow_joint_trajectory"
+           "control_msgs/FollowJointTrajectoryAction"))
+        (left-arm-vel-mux (init-mux-handle "/l_arm_vel/mux"))
+        (right-arm-vel-mux (init-mux-handle "/r_arm_vel/mux"))
+
+)
     (make-boxy-pm-handle :controller-manager controller-manager
-                         :right-arm right-arm)))
+                         :right-arm right-arm-joint-controller
+                         :left-arm left-arm-joint-controller
+                         :left-arm-vel-mux left-arm-vel-mux
+                         :right-arm-vel-mux right-arm-vel-mux)
+))
+
+(defun get-boxy-pm-handle ()
+  ;; WARNING: HAS SIDE-EFFECTS
+  (unless *boxy-pm-handle*
+    (setf *boxy-pm-handle* (init-boxy-pm-handle)))
+  *boxy-pm-handle*)
 
 (defun cleanup-boxy-pm-handle (handle)
   (close-persistent-service (boxy-controller-manager handle)))
