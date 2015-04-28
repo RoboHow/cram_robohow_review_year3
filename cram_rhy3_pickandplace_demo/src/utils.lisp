@@ -551,15 +551,18 @@ throughout the demo experiment."
 ;; Location utility quick functions
 
 (defmacro in-front-of (location try-indefinitely &body body)
-  `(cpl:with-failure-handling
-       ((cram-plan-failures:location-not-reached-failure (f)
-          (declare (ignore f))
-          (when ,try-indefinitely
-            (cpl:retry))
-          (unless ,try-indefinitely
-            (return t))))
-     (at-location (,location)
-       ,@body)))
+  `(cpl:with-retry-counters ((ctr 3))
+     (cpl:with-failure-handling
+         ((cram-plan-failures:location-not-reached-failure (f)
+            (declare (ignore f))
+            (when ,try-indefinitely
+              (cpl:do-retry ctr
+                (cpl:retry))
+              (return t))
+            (unless ,try-indefinitely
+              (return t))))
+       (at-location (,location)
+         ,@body))))
 
 (defmacro in-front-of-oven (demo-handle &body body)
   `(in-front-of (dh-loc-in-front-of-oven ,demo-handle) t
@@ -621,6 +624,19 @@ throughout the demo experiment."
                      (tf:make-quaternion 0 0 0 1)))))
       t))
 
+(defun go-in-front-of-island-2 ()
+  (in-front-of
+      (desig:make-designator
+       'location
+       `((desig-props::pose
+          ,(cl-tf:pose->pose-stamped
+            "/map" 0.0
+            (cl-transforms:make-pose
+             (cl-transforms:make-3d-vector -0.323 1.137 0.0)
+             (cl-transforms:make-quaternion 0 0 1 0.03))))
+         (desig-props:in-front-of desig-props:island)))
+      t))
+
 (defun go-in-front-of-fridge ()
   (in-front-of (make-designator
                 'location
@@ -629,15 +645,15 @@ throughout the demo experiment."
                      "map" 0.0
                      (tf:make-3d-vector 0.4874 -0.4438 0.05)
                      (tf:make-quaternion -0.01 -0.003 -0.126 0.992)))))
-      nil))
+      t))
 
 (defun go-in-front-of-fridge-2 ()
   (in-front-of (make-designator
                 'location
                 `((desig-props:pose
                    ,(tf:make-pose-stamped
-                     "map" 0.0
-                     (tf:make-3d-vector 0.483 -0.861 0.05)
+                     "map" 0.0;;0.483
+                     (tf:make-3d-vector 0.383 -0.861 0.05)
                      (tf:make-quaternion 0.0 -0.002 0.005 1.0)))))
       nil))
 
@@ -666,9 +682,43 @@ throughout the demo experiment."
 ;;;
 
 (defun perceive-spoon (demo-handle)
-  (perceive-a (dh-obj-spoon demo-handle)
-              :stationary t
-              :move-head nil))
+  (let* ((orig (dh-obj-spoon demo-handle))
+         (object (ensure-results
+                   (perceive-a orig
+                               :stationary t
+                               :move-head nil)))
+         (pose (reference (desig-prop-value
+                           object 'at)))
+         (transformed
+           (tf:copy-pose-stamped
+            (tf:pose->pose-stamped
+             (tf:frame-id pose) 0.0
+             (cl-transforms:transform-pose
+              (cl-transforms:make-transform
+               (tf:make-identity-vector)
+               (tf:euler->quaternion :ax pi :az (/ pi 2)))
+              (tf:make-pose
+               (tf:make-identity-vector)
+               (tf:orientation pose))))
+            :origin (tf:origin pose)))
+         (desig (make-designator
+                 'object
+                 (append (remove-if
+                          (lambda (a)
+                            (equal (car a) 'at))
+                          (description object))
+                         `((at
+                            ,(make-designator
+                              'location
+                              `((pose
+                                 ,transformed))))))))
+         (data (slot-value object 'desig:data)))
+    (setf (slot-value data 'pose) transformed)
+    (setf (slot-value desig 'desig:data) data)
+    (setf (slot-value orig 'desig:successor) desig)
+    (setf (slot-value desig 'desig:parent) orig)
+    ;desig
+    object))
 
 ;;;
 ;;; Ketchup
@@ -993,9 +1043,21 @@ throughout the demo experiment."
                     "HTTP://IAS.CS.TUM.EDU/KB/KNOWROB.OWL#DRAWER_FRIDGE_UPPER-1"
                     "HTTP://IAS.CS.TUM.EDU/KB/KNOWROB.OWL#DRAWER_FRIDGE_UPPER-2"
                     "HTTP://IAS.CS.TUM.EDU/KB/KNOWROB.OWL#DRAWER_FRIDGE_UPPER-3"
-                    "HTTP://IAS.CS.TUM.EDU/KB/KNOWROB.OWL#DRAWER_FRIDGE_UPPER-4")
+                    "HTTP://IAS.CS.TUM.EDU/KB/KNOWROB.OWL#DRAWER_FRIDGE_UPPER-4" ,(string (desig-prop-value tomato-sauce 'desig-props::name)))
                 (ensure-manipulation
-                  (pick-object tomato-sauce :stationary t :side :left)))
+                  (cpl:with-failure-handling
+                      ((cram-plan-failures:object-not-found (f)
+                         (declare (ignore f))
+                         (cpl:retry)))
+                    (pr2-manip-pm::execute-move-arm-pose
+                     :right
+                     (tf:make-pose-stamped
+                      "base_link" 0.0
+                      (tf:make-3d-vector -0.1 -0.5 1.4)
+                      (tf:euler->quaternion :az (/ pi 2)))
+                     :ignore-collisions t)
+                    (pick-object
+                     tomato-sauce :stationary t :side :left))))
               (setf pr2-manip-pm::*raise-elbow* t)
               (pr2-manip-pm::execute-move-arm-pose
                :right
@@ -1042,7 +1104,7 @@ throughout the demo experiment."
   (go-in-front-of-drawer)
   (ensure-arms-up)
   (look-into-drawer)
-  (let ((handle (perceive-handle-drawer demo-handle)))
+  (let ((handle (ensure-results (perceive-handle-drawer demo-handle))))
     (when handle
       (let* ((pose (desig-prop-value handle 'pose))
              (pose-map
@@ -1092,6 +1154,7 @@ throughout the demo experiment."
           (ensure-manipulation
             (move-handle-relative-pose
              :right (cl-transforms:make-3d-vector -0.4 -0.2 0.02) nil))
+          (pr2-manip-pm::open-gripper :right)
           (ensure-manipulation
             (move-arm-relative-pose
              :right (cl-transforms:make-3d-vector 0.2 0.0 0.0) t))
@@ -1102,6 +1165,7 @@ throughout the demo experiment."
           (move-base-relative-pose (cl-transforms:make-3d-vector
                                     -0.2 0.0 0.0))
           ;; Grasp object here.
+          (look-into-drawer)
           (let ((spoon (ensure-results (perceive-spoon demo-handle))))
             (ensure-manipulation
               (pick-object spoon :stationary t :side :left))
@@ -1120,19 +1184,27 @@ throughout the demo experiment."
   (let ((spoon-putdown-pose
           (tf:make-pose-stamped
            "map" 0.0
-           (tf:make-3d-vector -1 1.2 1)
+           (tf:make-3d-vector -1.05 1.0 0.83)
            (tf:euler->quaternion
-            :az pi :ax pi))))
-    (in-front-of-island demo-handle
-      (ensure-manipulation
-        (place-object
-         spoon
-         (make-designator
-          'location
-          `((desig-props::pose ,spoon-putdown-pose)))
-          ;; `((desig-props:on Cupboard)
-          ;;   (desig-props:name "kitchen_island")))
-         :stationary t)))))
+            :ax pi :az pi))))
+    (go-in-front-of-island-2)
+    (place-object
+     spoon
+     (make-designator
+      'location
+      `((desig-props::pose
+         ,spoon-putdown-pose)))
+     :stationary t)))
+    ;; (in-front-of-island demo-handle
+    ;;   (ensure-manipulation
+    ;;     (place-object
+    ;;      spoon
+    ;;      (make-designator
+    ;;       'location
+    ;;       `((desig-props::pose ,spoon-putdown-pose)))
+    ;;       ;; `((desig-props:on Cupboard)
+    ;;       ;;   (desig-props:name "kitchen_island")))
+    ;;      :stationary t)))))
 
 (defun test-spoon-putdown-pose ()
   (let ((spoon-putdown-pose

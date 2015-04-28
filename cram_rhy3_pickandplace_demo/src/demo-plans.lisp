@@ -66,6 +66,10 @@
     (try-forever
       (pick-object (perceive-tray demo-handle) :stationary t))))
 
+(def-cram-function fetch-tomato-sauce (demo-handle)
+  (let ((tomato-sauce (get-tomato-sauce demo-handle)))
+    (put-tomato-sauce-on-table demo-handle tomato-sauce)))
+
 (def-cram-function fetch-spoon (demo-handle)
   (let ((spoon (get-spoon demo-handle)))
     (put-spoon-on-table demo-handle spoon)))
