@@ -39,6 +39,7 @@
   (obj-tray nil)
   (obj-marker nil)
   (obj-spoon nil)
+  (obj-tomato-sauce nil)
   (name-handle-drawer nil)
   (name-handle-fridge nil))
 
@@ -95,6 +96,9 @@
                                 `((on Cupboard)
                                   (name "kitchen_island"))))))
      :obj-spoon (make-designator 'object `((type spoon)))
+     :obj-tomato-sauce (make-designator
+                        'object `((type desig-props:tomato-sauce)
+                                  (distance 0.03)))
      :obj-marker (make-designator 'object `((type armarker)))
      :name-handle-drawer "drawer_sinkblock_upper_handle"
      :name-handle-fridge "drawer_fridge_upper_handle")))
@@ -453,48 +457,61 @@ defaults to the topic `/object'."
                      (cpl:retry)))
                 (perceive-object 'cram-plan-library:all ,object))))))
 
-(defmacro pick-object (object &key stationary)
-  `(cpl:with-retry-counters ((retry-task 0))
-     (cpl:with-failure-handling
-         ((cram-plan-failures:manipulation-failure (f)
-            (declare (ignore f))
-            (cpl:do-retry retry-task
-              (ensure-arms-up)
-              (cpl:retry)))
-          (cram-plan-failures:location-not-reached-failure (f)
-            (declare (ignore f))
-            (cpl:do-retry retry-task
-              (ros-warn (longterm) "Cannot reach location. Retrying.")
-              (cpl:retry)))
-          (cram-plan-failures:object-not-found (f)
-            (declare (ignore f))
-            (cpl:do-retry retry-task
-              (ros-warn (longterm) "Object not found. Retrying.")
-              (cpl:retry))))
-       ,(cond (stationary
-               `(achieve `(cram-plan-library:object-picked ,,object)))
-              (t
-               `(achieve `(cram-plan-library:object-in-hand ,,object)))))))
+(defun pick-object (object &key stationary side)
+  (when side
+    (let ((new-description (append (description object)
+                                   `((desig-props::sides (,side)))
+                                   (when (eql (desig-prop-value
+                                               object 'type)
+                                              'tomato-sauce)
+                                     `((distance 0.03))))))
+      (setf (slot-value object 'cram-designators::description)
+            new-description)))
+  (cpl:with-retry-counters ((retry-task 0))
+    (cpl:with-failure-handling
+        ((cram-plan-failures:manipulation-failure (f)
+           (declare (ignore f))
+           (cpl:do-retry retry-task
+             (ensure-arms-up)
+             (cpl:retry)))
+         (cram-plan-failures:location-not-reached-failure (f)
+           (declare (ignore f))
+           (cpl:do-retry retry-task
+             (ros-warn (longterm) "Cannot reach location. Retrying.")
+             (cpl:retry)))
+         (cram-plan-failures:object-not-found (f)
+           (declare (ignore f))
+           (cpl:do-retry retry-task
+             (ros-warn (longterm) "Object not found. Retrying.")
+             (cpl:retry))))
+      (cond (stationary
+             (achieve `(cram-plan-library:object-picked ,object)))
+            (t
+             (achieve `(cram-plan-library:object-in-hand ,object)))))))
 
-(defmacro place-object (object location &key stationary)
-  `(cpl:with-failure-handling
-       ((cram-plan-failures:manipulation-pose-unreachable (f)
-          (declare (ignore f))
-          (cram-plan-library::retry-with-updated-location
-           ,location (next-solution ,location)))
-        (cram-plan-failures:location-not-reached-failure (f)
-          (declare (ignore f))
-          (ros-warn (longterm) "Cannot reach location. Retrying.")
-          (cpl:retry)))
-     (let ((side (var-value
-                  '?side
-                  (lazy-car (crs:prolog `(cram-plan-library:object-in-hand ,,object ?side))))))
-       (prog1
-           ,(cond (stationary
-                   `(achieve `(cram-plan-library::object-put ,,object ,,location)))
-                  (t
-                   `(achieve `(cram-plan-library::object-placed-at ,,object ,,location))))
-         (ensure-arms-up side)))))
+(defun place-object (object location &key stationary)
+  (cpl:with-failure-handling
+      ((cram-plan-failures:manipulation-pose-unreachable (f)
+         (declare (ignore f))
+         (cram-plan-library::retry-with-updated-location
+          location (next-solution location)))
+       (cram-plan-failures:location-not-reached-failure (f)
+         (declare (ignore f))
+         (ros-warn (longterm) "Cannot reach location. Retrying.")
+         (cpl:retry)))
+    (let ((side (var-value
+                 '?side
+                 (lazy-car (crs:prolog
+                            `(cram-plan-library:object-in-hand
+                              ,object ?side))))))
+      (prog1
+          (cond (stationary
+                 (achieve `(cram-plan-library::object-put
+                            ,object ,location)))
+                (t
+                 (achieve `(cram-plan-library::object-placed-at
+                            ,object ,location))))
+        (ensure-arms-up side)))))
 
 ;;;
 ;;; Locations
@@ -538,7 +555,9 @@ throughout the demo experiment."
        ((cram-plan-failures:location-not-reached-failure (f)
           (declare (ignore f))
           (when ,try-indefinitely
-            (cpl:retry))))
+            (cpl:retry))
+          (unless ,try-indefinitely
+            (return t))))
      (at-location (,location)
        ,@body)))
 
@@ -550,12 +569,113 @@ throughout the demo experiment."
   `(in-front-of (dh-loc-in-front-of-island ,demo-handle) t
      ,@body))
 
+(defun look-into-drawer ()
+  (let* ((look-at-pose
+           (cl-tf:make-pose-stamped
+            "map" 0.0
+            (tf:make-3d-vector 0.8 0.78 1.0)
+            (tf:make-identity-rotation)))
+         (look-at-pose-in-base-link
+           (cl-tf2:ensure-pose-stamped-transformed
+            *tf2*
+            look-at-pose
+            "base_link" :use-current-ros-time t)))
+    (with-designators
+        ((look-at (action
+                   `((desig-props::type desig-props::trajectory)
+                     (desig-props::to desig-props:see)
+                     (desig-props::pose ,look-at-pose-in-base-link)))))
+      (perform look-at))))
+
+(defun look-front ()
+  (with-designators
+      ((look-at (action
+                 `((desig-props::type desig-props::trajectory)
+                   (desig-props::to desig-props:see)
+                   (desig-props::pose
+                    ,(tf:make-pose-stamped
+                      "base_link" 0.0
+                      (tf:make-3d-vector 1.0 0.0 0.8)
+                      (tf:make-identity-rotation)))))))
+    (perform look-at)))
+
+(defun look-front-right ()
+  (with-designators
+      ((look-at (action
+                 `((desig-props::type desig-props::trajectory)
+                   (desig-props::to desig-props:see)
+                   (desig-props::pose
+                    ,(tf:make-pose-stamped
+                      "base_link" 0.0
+                      (tf:make-3d-vector 1.0 -0.8 0.8)
+                      (tf:make-identity-rotation)))))))
+    (perform look-at)))
+
+(defun go-in-front-of-drawer ()
+  (in-front-of (make-designator
+                'location
+                `((desig-props:pose
+                   ,(tf:make-pose-stamped
+                     "map" 0.0
+                     (tf:make-3d-vector 0.638 0.788 0.0)
+                     (tf:make-quaternion 0 0 0 1)))))
+      t))
+
+(defun go-in-front-of-fridge ()
+  (in-front-of (make-designator
+                'location
+                `((desig-props:pose
+                   ,(tf:make-pose-stamped
+                     "map" 0.0
+                     (tf:make-3d-vector 0.4874 -0.4438 0.05)
+                     (tf:make-quaternion -0.01 -0.003 -0.126 0.992)))))
+      nil))
+
+(defun go-in-front-of-fridge-2 ()
+  (in-front-of (make-designator
+                'location
+                `((desig-props:pose
+                   ,(tf:make-pose-stamped
+                     "map" 0.0
+                     (tf:make-3d-vector 0.483 -0.861 0.05)
+                     (tf:make-quaternion 0.0 -0.002 0.005 1.0)))))
+      nil))
+
+(defun go-in-front-of-fridge-3 ()
+  (in-front-of (make-designator
+                'location
+                `((desig-props:pose
+                   ,(tf:make-pose-stamped
+                     "map" 0.0;0.747
+                     (tf:make-3d-vector 1.0 -0.51 0.05)
+                     (tf:euler->quaternion)))))
+      nil))
+
+(defun go-in-front-of-fridge-4 ()
+  (in-front-of (make-designator
+                'location
+                `((desig-props:pose
+                   ,(tf:make-pose-stamped
+                     "map" 0.0
+                     (tf:make-3d-vector 0.416 -0.881 0.0)
+                     (tf:euler->quaternion)))))
+      nil))
+
 ;;;
 ;;; Spoon
 ;;;
 
 (defun perceive-spoon (demo-handle)
   (perceive-a (dh-obj-spoon demo-handle)
+              :stationary t
+              :move-head nil))
+
+;;;
+;;; Ketchup
+;;;
+
+(defun perceive-tomato-sauce (demo-handle)
+  (perceive-a (dh-obj-tomato-sauce demo-handle)
               :stationary t
               :move-head nil))
 
@@ -716,3 +836,303 @@ throughout the demo experiment."
 
 (defun perceive-tracked-human (demo-handle)
   (loop until (is-human-in-scene demo-handle)))
+
+(defun relative-linear-arm-translation->trajectory
+    (arm rel-position &key (ignore-collisions t)
+                        (raise-elbow t))
+  (let* ((id-pose
+           (tf:pose->pose-stamped
+            (case arm
+              (:left "l_wrist_roll_link")
+              (:right "r_wrist_roll_link"))
+            0.0 (tf:make-identity-pose)))
+         (tl-pose
+           (cl-tf2:ensure-pose-stamped-transformed
+            *tf2* id-pose "torso_lift_link"
+            :use-current-ros-time t))
+         (tl-translated-pose
+           (tf:copy-pose-stamped
+            tl-pose
+            :origin (tf:v+ (tf:origin tl-pose)
+                           rel-position))))
+    (pr2-manip-pm::arm-pose->trajectory
+     arm tl-translated-pose
+     :ignore-collisions ignore-collisions
+     :raise-elbow (when raise-elbow arm))))
+
+(defmacro ensure-results (&body body)
+  `(loop as result = (cpl:with-failure-handling
+                         ((cram-plan-library::object-not-found (f)
+                            (declare (ignore f))
+                            (cpl:retry)))
+                       ,@body)
+         while (not result)
+         finally (return result)))
+
+(defmacro ensure-manipulation (&body body)
+  `(cpl:with-failure-handling
+       ((cram-plan-library::manipulation-failure (f)
+          (declare (ignore f))
+          (cpl:retry)))
+     ,@body))
+
+(defun get-tomato-sauce (demo-handle)
+  (ensure-arms-up)
+  (go-in-front-of-fridge)
+  (look-front)
+  (let ((handle (ensure-results (perceive-handle-fridge demo-handle))))
+    (when handle
+      (let* ((pose (desig-prop-value handle 'pose))
+             (pose-map
+               (cl-tf2:ensure-pose-stamped-transformed
+                *tf2* pose "map" :use-current-ros-time t)))
+        (labels ((move-handle-relative-pose
+                     (side vector ignore-collisions
+                      &optional (orientation (cl-transforms:euler->quaternion)))
+                   (pr2-manip-pm::execute-move-arm-pose
+                    side
+                    (cl-tf:copy-pose-stamped
+                     pose-map
+                     :origin (cl-transforms:v+
+                              (cl-transforms:origin pose-map)
+                              vector)
+                     :orientation orientation)
+                    :ignore-collisions ignore-collisions))
+                 (move-arm-relative-pose (side vector ignore-collisions)
+                   (let ((traj
+                           (relative-linear-arm-translation->trajectory
+                            side vector
+                            :ignore-collisions ignore-collisions
+                            :raise-elbow nil)))
+                     (moveit:execute-trajectory traj)))
+                 (move-base-relative-pose (vector)
+                   (let* ((base-id
+                            (cl-tf2:ensure-pose-stamped-transformed
+                             *tf2*
+                             (cl-tf:pose->pose-stamped
+                              "base_footprint" 0.0
+                              (cl-transforms:make-identity-pose))
+                             "map"))
+                          (base-translated
+                            (cl-tf:copy-pose-stamped
+                             base-id
+                             :origin (cl-tf:v+ (cl-tf:origin base-id)
+                                               vector))))
+                     (let ((action (make-designator
+                                    'action `((desig-props:type
+                                               desig-props:navigation)
+                                              (desig-props:goal
+                                               ,(make-designator
+                                                 'location
+                                                 `((desig-props:pose
+                                                    ,base-translated))))))))
+                       (perform action)))))
+          (ensure-manipulation
+            (move-handle-relative-pose
+             :right (cl-transforms:make-3d-vector -0.3 0.03 0.0) nil))
+          (pr2-manip-pm::open-gripper :right)
+          (ensure-manipulation
+            (move-handle-relative-pose
+             :right (cl-transforms:make-3d-vector -0.19 0.03 0.0) t))
+          (pr2-manip-pm::close-gripper :right)
+          (ensure-manipulation
+            (move-handle-relative-pose
+             :right (cl-transforms:make-3d-vector -0.4 -0.15 0.0) t
+             (cl-transforms:euler->quaternion :az 0.7)))
+          (ensure-manipulation
+            (move-handle-relative-pose
+             :right (cl-transforms:make-3d-vector -0.45 -0.30 0.0) t
+             (cl-transforms:euler->quaternion :az 1.0)))
+          (ensure-manipulation
+            (move-handle-relative-pose
+             :right (cl-transforms:make-3d-vector -0.45 -0.40 0.0) t
+             (cl-transforms:euler->quaternion :az 1.2)))
+          (pr2-manip-pm::open-gripper :right)
+          (ensure-manipulation
+            (move-arm-relative-pose
+             :right (cl-transforms:make-3d-vector -0.1 -0.10 0.0) t))
+          (ensure-manipulation
+            (pr2-manip-pm::execute-move-arm-pose
+             :right (tf:make-pose-stamped
+                     "base_link" 0.0
+                     (tf:make-3d-vector -0.2 -0.5 1.4)
+                     (tf:euler->quaternion
+                      :ay (/ pi -2)))))
+          (go-in-front-of-fridge-2)
+          (pr2-manip-pm::close-gripper :left)
+          (ensure-manipulation
+            (pr2-manip-pm::execute-move-arm-pose
+             :left (tf:make-pose-stamped
+                    "base_link" 0.0
+                    (tf:make-3d-vector 0.45 0.2 0.95)
+                    (tf:euler->quaternion :az (/ pi -2)))
+             :ignore-collisions t))
+          (ensure-manipulation
+            (pr2-manip-pm::execute-move-arm-pose
+             :left (tf:make-pose-stamped
+                    "base_link" 0.0
+                    (tf:make-3d-vector 0.45 -0.2 0.95)
+                    (tf:euler->quaternion :az (/ pi -2)))
+             :ignore-collisions t))
+          (ensure-arms-up :left)
+          (go-in-front-of-fridge-3)
+          (look-front-right)
+          (let ((tomato-sauce (ensure-results (perceive-tomato-sauce demo-handle))))
+            (setf pr2-manip-pm::*raise-elbow* nil)
+            (moveit::without-collision-object "HTTP://IAS.CS.TUM.EDU/KB/KNOWROB.OWL#DRAWER_FRIDGE_UPPER-0"
+              (ensure-manipulation
+                (pick-object tomato-sauce :stationary t :side :left)))
+            (setf pr2-manip-pm::*raise-elbow* t)
+            (pr2-manip-pm::execute-move-arm-pose
+             :right
+             (tf:make-pose-stamped
+              "base_link" 0.0
+              (tf:make-3d-vector -0.1 -0.5 1.4)
+              (tf:euler->quaternion :az (/ pi 2)))
+             :ignore-collisions t)
+            (go-in-front-of-fridge-4)
+            (pr2-manip-pm::execute-move-arm-pose
+             :right
+             (tf:make-pose-stamped
+              "base_link" 0.0
+              (tf:make-3d-vector -0.1 -0.8 1.4)
+              (tf:euler->quaternion)))
+            (pr2-manip-pm::execute-move-arm-pose
+             :right
+             (tf:make-pose-stamped
+              "base_link" 0.0
+              (tf:make-3d-vector 0.4 -0.8 1.2)
+              (tf:euler->quaternion)))
+            (pr2-manip-pm::execute-move-arm-pose
+             :right
+             (tf:make-pose-stamped
+              "base_link" 0.0
+              (tf:make-3d-vector 0.4 -0.2 1.2)
+              (tf:euler->quaternion)))
+            tomato-sauce))))))
+
+(defun put-tomato-sauce-on-table (demo-handle tomato-sauce)
+  (let* ((target-pose
+           (tf:make-pose-stamped
+            "map" 0.0
+            (tf:make-3d-vector -0.8 1.0 1.15)
+            (tf:euler->quaternion :az pi)))
+         (loc (make-designator
+               'location `((desig-props:pose
+                            ,target-pose)))))
+    (publish-pose target-pose)
+    (ensure-manipulation
+      (place-object tomato-sauce loc))))
+
+(defun get-spoon (demo-handle)
+  (go-in-front-of-drawer)
+  (ensure-arms-up)
+  (look-into-drawer)
+  (let ((handle (perceive-handle-drawer demo-handle)))
+    (when handle
+      (let* ((pose (desig-prop-value handle 'pose))
+             (pose-map
+               (cl-tf2:ensure-pose-stamped-transformed
+                *tf2* pose "map" :use-current-ros-time t)))
+        (labels ((move-handle-relative-pose
+                     (side vector ignore-collisions)
+                   (pr2-manip-pm::execute-move-arm-pose
+                    side
+                    (cl-tf:copy-pose-stamped
+                     pose-map
+                     :origin (cl-transforms:v+
+                              (cl-transforms:origin pose-map)
+                              vector)
+                     :orientation (cl-transforms:euler->quaternion
+                                   :ax (/ pi 2)))
+                    :ignore-collisions ignore-collisions))
+                 (move-arm-relative-pose (side vector ignore-collisions)
+                   (let ((traj
+                           (relative-linear-arm-translation->trajectory
+                            side vector
+                            :ignore-collisions ignore-collisions
+                            :raise-elbow nil)))
+                     (moveit:execute-trajectory traj)))
+                 (move-base-relative-pose (vector)
+                   (let* ((base-id
+                            (cl-tf2:ensure-pose-stamped-transformed
+                             *tf2*
+                             (cl-tf:pose->pose-stamped
+                              "base_footprint" 0.0
+                              (cl-transforms:make-identity-pose))
+                             "map"))
+                          (base-translated
+                            (cl-tf:copy-pose-stamped
+                             base-id
+                             :origin (cl-tf:v+ (cl-tf:origin base-id)
+                                               vector))))
+                     (let ((action (make-designator
+                                    'action `((desig-props:type
+                                               desig-props:navigation)
+                                              (desig-props:goal
+                                               ,(make-designator
+                                                 'location
+                                                 `((desig-props:pose
+                                                    ,base-translated))))))))
+                       (perform action)))))
+          (ensure-manipulation
+            (move-handle-relative-pose
+             :right (cl-transforms:make-3d-vector -0.4 -0.2 0.02) nil))
+          (ensure-manipulation
+            (move-arm-relative-pose
+             :right (cl-transforms:make-3d-vector 0.2 0.0 0.0) t))
+          (pr2-manip-pm::close-gripper :right)
+          (ensure-manipulation
+            (move-arm-relative-pose
+             :right (cl-transforms:make-3d-vector -0.2 0.0 0.0) t))
+          (move-base-relative-pose (cl-transforms:make-3d-vector
+                                    -0.2 0.0 0.0))
+          ;; Grasp object here.
+          (let ((spoon (ensure-results (perceive-spoon demo-handle))))
+            (ensure-manipulation
+              (pick-object spoon :stationary t :side :left))
+            (ensure-manipulation
+              (move-arm-relative-pose
+               :right (cl-transforms:make-3d-vector 0.4 0.0 0.0) t))
+            (pr2-manip-pm::open-gripper :right)
+            (ensure-manipulation
+              (move-arm-relative-pose
+               :right (cl-transforms:make-3d-vector -0.2 0.0 0.0) t))
+            (ensure-arms-up)
+            spoon))))))
+
+(defun put-spoon-on-table (demo-handle spoon)
+  (declare (ignorable demo-handle))
+  (let ((spoon-putdown-pose
+          (tf:make-pose-stamped
+           "map" 0.0
+           (tf:make-3d-vector -1 1.2 1)
+           (tf:euler->quaternion
+            :az pi :ax pi))))
+    (in-front-of-island demo-handle
+      (ensure-manipulation
+        (place-object
+         spoon
+         (make-designator
+          'location
+          `((desig-props::pose ,spoon-putdown-pose)))
+          ;; `((desig-props:on Cupboard)
+          ;;   (desig-props:name "kitchen_island")))
+         :stationary t)))))
+
+(defun test-spoon-putdown-pose ()
+  (let ((spoon-putdown-pose
+          (tf:make-pose-stamped
+           "map" 0.0
+           (tf:make-3d-vector -1 1.2 1)
+           (tf:euler->quaternion
+            :az pi :ax pi))))
+    (roslisp:publish
+     (roslisp:advertise "/testpose" "geometry_msgs/PoseStamped")
+     (tf:pose-stamped->msg spoon-putdown-pose))))
+
+(defun current-robot-pose ()
+  (cl-tf2:ensure-pose-stamped-transformed
+   *tf2* (tf:pose->pose-stamped "base_footprint" 0.0
+                                (tf:make-identity-pose))
+   "map"))

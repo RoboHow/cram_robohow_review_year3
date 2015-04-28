@@ -66,6 +66,10 @@
     (try-forever
       (pick-object (perceive-tray demo-handle) :stationary t))))
 
+(def-cram-function fetch-spoon (demo-handle)
+  (let ((spoon (get-spoon demo-handle)))
+    (put-spoon-on-table demo-handle spoon)))
+
 (def-cram-function shove-tray-into-oven (demo-handle)
   (in-front-of-oven demo-handle
     (look-at-marker-suitable-pose)

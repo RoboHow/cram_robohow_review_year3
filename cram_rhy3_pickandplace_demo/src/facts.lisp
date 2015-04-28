@@ -65,6 +65,9 @@
                           (make-area-restriction-cost-function)
                           ?cm)))
 
+(defun detection-has-type (detection)
+  (cadr (assoc 'desig-props:type detection)))
+
 (def-fact-group object-refinement-facts (infer-object-property
                                          object-handle
                                          cram-language::grasp-effort
@@ -73,6 +76,12 @@
   (<- (object-color ?object ?color ?value)
     (desig-prop ?object (desig-props:color ?colors))
     (crs:lisp-fun object-color ?colors ?color ?value))
+  
+  (<- (make-handles-further ?segments ?offset-angle ?handles)
+    (symbol-value pi ?pi)
+    (crs:lisp-fun / ?pi 2 ?pi-half)
+    (make-handles 0.05 ?segments ?offset-angle desig-props:push
+                  ?pi-half 0 0 0 0 0.05 ?handles))
   
   (<- (make-handles ?segments ?offset-angle ?handles)
     (symbol-value pi ?pi)
@@ -101,6 +110,10 @@
     (desig-prop ?object (desig-props:response ?response))
     (crs:lisp-pred string= ?response "spoon"))
   
+  (<- (infer-object-property ?object desig-props:type desig-props:tomato-sauce)
+    (desig-prop ?object (desig-props::detection ?detection))
+    (crs:lisp-fun detection-has-type ?detection "Ketchup_bottle"))
+  
   (<- (infer-object-property ?object desig-props:handle ?handle)
     (crs:once
      (or (desig-prop ?object (desig-props:type ?type))
@@ -117,6 +130,11 @@
     (make-handles 0.18 2 0 desig-props:push ?pi ?tilt2
                   0.0 0.0 0.0 0.0 ?handles-list))
   
+  (<- (object-handle desig-props:tomato-sauce ?handles-list)
+    (symbol-value pi ?pi)
+    (crs:lisp-fun / ?pi 2 ?pi-half)
+    (make-handles-further 1 0 ?handles-list))
+  
   (<- (object-handle desig-props:spoon ?handles-list)
     (symbol-value pi ?pi)
     (crs:lisp-fun / ?pi 2 ?pi-half)
@@ -124,6 +142,9 @@
     (make-handles 0.0 1 0 desig-props:push
                   ?pi-half ?minus-pi-half 0.0
                   0.0 0.0 -0.0 ?handles-list))
+                  ;; 0.0 ?minus-pi-half ?pi-half
+                  ;; ;; Fix these offsets! Maybe z is too low.
+                  ;; 0.05 0.0 0.0 ?handles-list))
   
   ;; Tray: Carry with 2 arms
   (<- (object-carry-handles desig-props:tray 2))

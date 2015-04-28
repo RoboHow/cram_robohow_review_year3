@@ -65,4 +65,4 @@
                      #:grasp-type #:black #:yellow #:white #:grey #:red
                      #:blu #:cyan #:magenta #:green #:timestamp
                      #:plane-distance #:segment #:dimensions-2d #:on
-                     #:name #:response #:spoon))
+                     #:name #:response #:spoon #:tomato-sauce #:distance))
