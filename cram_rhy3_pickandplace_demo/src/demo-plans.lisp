@@ -61,6 +61,19 @@
       (human-tracking) ;; This happens after everything else and triggers tracking of the human. It automatically waits for the PR2 to report that the tray was shoven into the oven.
       (destroy-demo-handle dh))))
 
+(def-cram-function grasp-spoon (demo-handle)
+  (let ((park-right-arm-action
+          (make-designator 'action '((:to :move)
+                                     (:arm :right)
+                                     (:config (-1.25 -1.23 -0.29 -2.1 0.4 0.58 0.13)))))
+        (pregrasp-config-action
+          (make-designator 'action '((:to :move)
+                                     (:arm :right)
+                                     (:config (-1.47 0.98 -1.2 -1.9 0.26 0.0 1.1))))))
+    (perform park-right-arm-action)
+    (perceive-spoon demo-handle)
+    (perform pregrasp-config-action)))
+
 (def-cram-function fetch-tray (demo-handle)
   (in-front-of-island demo-handle
     (try-forever

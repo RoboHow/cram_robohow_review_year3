@@ -43,6 +43,7 @@
                cram-environment-representation
                pr2-manipulation-knowledge
                pr2-manipulation-process-module
+               cram-boxy-process-module
                pr2-reachability-costmap
                pr2-navigation-process-module
                pr2-reachability-costmap
