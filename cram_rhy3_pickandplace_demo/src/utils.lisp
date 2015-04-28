@@ -224,7 +224,8 @@ PR2."
   "Register and start all process modules necessary for operatinxg
 Boxy."
   `(cpm:with-process-modules-running
-       (robosherlock-mini-pm:robosherlock-mini-process-module)
+       (robosherlock-mini-pm:robosherlock-mini-process-module
+        boxy-pm:boxy-process-module)
      ,@body))
 
 (defmacro try-n-times (n &body body)
@@ -719,6 +720,13 @@ throughout the demo experiment."
     (setf (slot-value desig 'desig:parent) orig)
     ;desig
     object))
+
+;; (defun perceive-spoon-2 (demo-handle)
+;;   (let ((perceived-desigs 
+;;           (perceive-all (dh-obj-spoon demo-handle) :stationary t :move-head nil)))
+;;     (flet ((get-object-type (desig)
+;;              (second (find 'type (desig-prop-value desig 'desig-props::detection) :key #'car))))
+;;       (find "spoon" perceived-desigs :test #'string= :key #'get-object-type))))
 
 ;;;
 ;;; Ketchup
