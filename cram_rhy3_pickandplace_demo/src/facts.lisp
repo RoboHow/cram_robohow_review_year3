@@ -80,7 +80,7 @@
   (<- (make-handles-further ?segments ?offset-angle ?handles)
     (symbol-value pi ?pi)
     (crs:lisp-fun / ?pi 2 ?pi-half)
-    (make-handles 0.05 ?segments ?offset-angle desig-props:push
+    (make-handles 0.06 ?segments ?offset-angle desig-props:push
                   ?pi-half 0 0 0 0 0.05 ?handles))
   
   (<- (make-handles ?segments ?offset-angle ?handles)
@@ -133,7 +133,7 @@
   (<- (object-handle desig-props:tomato-sauce ?handles-list)
     (symbol-value pi ?pi)
     (crs:lisp-fun / ?pi 2 ?pi-half)
-    (make-handles-further 1 0 ?handles-list))
+    (make-handles-further 1 -0.4 ?handles-list))
   
   (<- (object-handle desig-props:spoon ?handles-list)
     (symbol-value pi ?pi)
