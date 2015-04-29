@@ -43,7 +43,6 @@
 ;; NOTE(winkler): Two top level plans, one for each robot. @georg, is
 ;; this feasible for you?
 (def-top-level-cram-function pizza-making-pr2 ()
-  (start-node)
   (with-process-modules-pr2
     (let ((dh (get-demo-handle)))
       (initialize-demo-setup dh :pr2 :enable-logging t)
@@ -73,13 +72,28 @@
 (def-cram-function grasp-spoon (demo-handle)
   (with-designators ((park-right-arm (action '((desig-props::type desig-props::trajectory)
                                                (desig-props::to desig-props::park)
-                                               (desig-props::arm desig-props::right)))))
+                                               (desig-props::arm desig-props::right))))
+                     (park-left-arm (action '((desig-props::type desig-props::trajectory)
+                                               (desig-props::to desig-props::park)
+                                               (desig-props::arm desig-props::left)))))
     (perform park-right-arm)
-;    (perceive-spoon demo-handle)
-    
-;    (perform pregrasp-config-action)
-
-))
+    (perform park-left-arm)
+    (let ((spoon (dh-obj-spoon demo-handle)))
+      ;; lookat right-table
+      (perceive-object 'cram-plan-library:currently-visible spoon)
+      (achieve `(object-picked ,spoon))
+      ;; lookat center
+      ;; perceive pizza tray
+      ;; perceive tomate sauce
+      ;; add tomate sauce
+      ;; perceive cheese
+      ;; add cheese
+      ;; lookat left side
+      ;; perceive ham
+      ;; add ham
+      ;;
+      ;; call pr2
+      )))
 
 (def-cram-function fetch-tray (demo-handle)
   (go-in-front-of-island-2)
