@@ -577,9 +577,13 @@ throughout the demo experiment."
 (defun look-into-drawer ()
   (let* ((look-at-pose
            (cl-tf:make-pose-stamped
-            "map" 0.0
-            (tf:make-3d-vector 0.8 0.78 1.0) ;; TODO: Correct me!
+            "base_link" 0.0
+            (tf:make-3d-vector 0.8 0.0 0.5) ;; TODO: Correct me!
             (tf:make-identity-rotation)))
+           ;; (cl-tf:make-pose-stamped
+           ;;  "map" 0.0
+           ;;  (tf:make-3d-vector 0.8 0.78 1.0) ;; TODO: Correct me!
+           ;;  (tf:make-identity-rotation)))
          (look-at-pose-in-base-link
            (cl-tf2:ensure-pose-stamped-transformed
             *tf2*
