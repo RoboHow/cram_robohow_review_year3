@@ -1096,11 +1096,12 @@ throughout the demo experiment."
               tomato-sauce)))))))
 
 (defun put-tomato-sauce-on-table (demo-handle tomato-sauce)
+  (declare (ignore demo-handle))
   (let* ((target-pose
            (tf:make-pose-stamped
             "map" 0.0
-            (tf:make-3d-vector -0.8 1.0 1.05)
-            (tf:euler->quaternion :az pi)))
+            (tf:make-3d-vector 1.3 1.0 0.95)
+            (tf:euler->quaternion)))
          (loc (make-designator
                'location `((desig-props:pose
                             ,target-pose)))))
@@ -1192,17 +1193,21 @@ throughout the demo experiment."
   (let ((spoon-putdown-pose
           (tf:make-pose-stamped
            "map" 0.0
-           (tf:make-3d-vector -1.05 1.0 0.83)
+           (tf:make-3d-vector -1.0 1.0 0.9)
            (tf:euler->quaternion
             :ax pi :az pi))))
     (go-in-front-of-island-2)
-    (place-object
-     spoon
-     (make-designator
-      'location
-      `((desig-props::pose
-         ,spoon-putdown-pose)))
-     :stationary t)))
+    (cpl:with-failure-handling
+        ((cram-plan-failures:manipulation-failure (f)
+           (declare (ignore f))
+           (cpl:retry)))
+      (place-object
+       spoon
+       (make-designator
+        'location
+        `((desig-props::pose
+           ,spoon-putdown-pose)))
+       :stationary t))))
     ;; (in-front-of-island demo-handle
     ;;   (ensure-manipulation
     ;;     (place-object
@@ -1239,3 +1244,66 @@ throughout the demo experiment."
 (defun start-node ()
   (roslisp-utilities:startup-ros)
   (select-rs-instance "handles"))
+
+(defun close-oven (demo-handle)
+  (in-front-of-oven demo-handle)
+  (labels ((move-base-relative-pose (vector)
+             (let* ((base-id
+                      (cl-tf2:ensure-pose-stamped-transformed
+                       *tf2*
+                       (cl-tf:pose->pose-stamped
+                        "base_footprint" 0.0
+                        (cl-transforms:make-identity-pose))
+                       "map"))
+                    (base-translated
+                      (cl-tf:copy-pose-stamped
+                       base-id
+                       :origin (cl-tf:v+ (cl-tf:origin base-id)
+                                         vector))))
+               (let ((action (make-designator
+                              'action `((desig-props:type
+                                         desig-props:navigation)
+                                        (desig-props:goal
+                                         ,(make-designator
+                                           'location
+                                           `((desig-props:pose
+                                              ,base-translated))))))))
+                 (perform action)))))
+    (move-base-relative-pose
+     (tf:make-3d-vector -0.2 0.0 0.0))
+    (pr2-manip-pm::execute-move-arm-pose
+     :right
+     (tf:make-pose-stamped
+      "base_link" 0.0
+      (tf:make-3d-vector 0.1 -0.7 1.2)
+      (tf:euler->quaternion))
+     :ignore-collisions t)
+    (pr2-manip-pm::execute-move-arm-pose
+     :right
+     (tf:make-pose-stamped
+      "base_link" 0.0
+      (tf:make-3d-vector 0.1 -0.7 0.7)
+      (tf:euler->quaternion))
+     :ignore-collisions t)
+    (pr2-manip-pm::execute-move-arm-pose
+     :right
+     (tf:make-pose-stamped
+      "base_link" 0.0
+      (tf:make-3d-vector 0.4 -0.2 0.7)
+      (tf:euler->quaternion))
+     :ignore-collisions t)
+    (pr2-manip-pm::execute-move-arm-pose
+     :right
+     (tf:make-pose-stamped
+      "base_link" 0.0
+      (tf:make-3d-vector 0.5 -0.2 1.2)
+      (tf:euler->quaternion))
+     :ignore-collisions t)
+    (pr2-manip-pm::execute-move-arm-pose
+     :right
+     (tf:make-pose-stamped
+      "base_link" 0.0
+      (tf:make-3d-vector 0.75 -0.2 1.2)
+      (tf:euler->quaternion))
+     :ignore-collisions t))
+  (ensure-arms-up))
