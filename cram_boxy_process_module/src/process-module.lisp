@@ -27,6 +27,10 @@
 
 (in-package :boxy-pm)
 
+;;;
+;;; HANDLE STUFF
+;;;
+
 (defparameter *boxy-pm-handle* nil)
 
 (defstruct (boxy-pm-handle (:conc-name boxy-))
@@ -80,6 +84,10 @@
 (defun cleanup-boxy-pm-handle (handle)
   (close-persistent-service (boxy-controller-manager handle)))
 
+;;;
+;;; PROCESS MODULE GENERALITIES
+;;;
+
 (defgeneric call-action (action &rest params))
 
 (defmacro def-action-handler (name args &body body)
@@ -87,7 +95,32 @@
     `(defmethod call-action ((,action-sym (eql ',name)) &rest ,params)
        (destructuring-bind ,args ,params ,@body))))
 
+(defun valid-package-symbol-p (symbol)
+  "Predicate that checks whether `symbol' is interned in CRAM-BOXY-PM."
+  (eql (symbol-package symbol) (find-package 'cram-boxy-process-module)))
+
+(defun safe-reference (desig)
+  "Iterates over all reference solutions for the action designator `desig' until
+ it finds one that refers to an action-handler in this package and returns that
+ solution. If no such solution exists, it returns NIL."
+  (loop for solution = (reference des) with des = desig do
+    (when (valid-package-symbol-p (car solution))
+      (return solution))
+    (if (next-solution des)
+        (setf des (next-solution des))
+        (return nil))))
+
+(def-process-module boxy-process-module (desig)
+  (apply #'call-action (safe-reference desig)))
+
+;;;
+;;; SPECIFIC ACTION-HANDLERS
+;;;
+
 (def-action-handler arm-joint-move (side config &optional (time 5.0))
+ (arm-joint-move side config time))
+
+(defun arm-joint-move (side config &optional (time 5.0))
   (ros-info (boxy-pm) "Moving ~a arm to config: ~a" side config)
   (let* ((handle (get-boxy-pm-handle))
          (controller (ecase side
@@ -108,22 +141,40 @@
            :mode 0 :pose (cl-tf:pose-stamped->msg pose))
      timeout 1.0)))  
 
-(def-process-module boxy-process-module (desig)
-  (apply #'call-action (reference desig)))
+(def-action-handler grasp (side pre-config)
+  (arm-joint-move side pre-config))
+
+;;;
+;;; PROLOG FACTS
+;;;
 
 (def-fact-group boxy-pm-action-designators (action-desig)
 
-  (<- (action-desig ?designator (arm-joint-move ?side ?config))
+  (<- (action-desig ?designator (arm-joint-move :right ?config)) 
     (desig::action-desig? ?designator)
-    (desig-prop ?designator (:to :move))
-    (desig-prop ?designator (:arm ?side))
-    (desig-prop ?designator (:config ?config)))
+    (desig-prop ?designator (type trajectory))
+    (desig-prop ?designator (to park))
+    (desig-prop ?designator (arm right))
+    (equal ?config (-1.25 -1.23 -0.29 -2.1 0.4 0.58 0.13)))
 
   (<- (action-desig ?designator (look-at ?pose))
     (desig::action-desig? ?designator)
+    (desig-prop ?designator (type trajectory))
     (desig-prop ?designator (to follow))
     (desig-prop ?designator (pose ?pose)))
-                    
+      
+  (<- (action-desig ?designator (grasp ?side ?pre-config))
+    (desig::action-desig? ?designator)
+    (desig-prop ?designator (type trajectory))
+    (desig-prop ?designator (to grasp))
+    (desig-prop ?designator (obj ?obj))
+    (current-designator ?obj ?current-obj)
+    (obj-desig? ?current-obj)
+    (desig-prop ?current-obj (type spoon))
+    (equal ?side :right)
+    (equal ?pre-config (-1.47 0.98 -1.2 -1.9 0.26 0.0 1.1)))
+           
+                                 
 )
 
 (def-fact-group boxy-process-module (matching-process-module available-process-module)
@@ -132,13 +183,19 @@
     (desig::action-desig? ?designator)
     (or 
      (and 
-      (desig-prop ?designator (:to :home))
-      (desig-prop ?designator (:arm ?_))
-      (desig-prop ?designator (:config ?_)))
+      (desig-prop ?designator (type trajectory))
+      (desig-prop ?designator (to park))
+      (desig-prop ?designator (arm ?_)))
      (and
+      (desig-prop ?designator (type trajectory))
       (desig-prop ?designator (to follow))
-      (desig-prop ?designator (pose ?pose))
-      )))
+      (desig-prop ?designator (pose ?pose)))
+     (and
+      (desig-prop ?designator (type trajectory))
+      (desig-prop ?designator (to grasp))
+      (desig-prop ?designator (obj ?_)))
+
+))
                            
   (<- (available-process-module boxy-process-module)
     (crs:true)))
