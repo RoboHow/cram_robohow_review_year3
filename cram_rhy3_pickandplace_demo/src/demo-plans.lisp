@@ -43,14 +43,17 @@
 ;; NOTE(winkler): Two top level plans, one for each robot. @georg, is
 ;; this feasible for you?
 (def-top-level-cram-function pizza-making-pr2 ()
+  (start-node)
   (with-process-modules-pr2
     (let ((dh (get-demo-handle)))
       (initialize-demo-setup dh :pr2)
       ;; TODO(all): Perform actual PR2 demo plans here
       ;; Do everything pizza-making related here before moving the tray
-      (fetch-tray dh)
+      ;(fetch-spoon dh)
+      (fetch-tomato-sauce dh)
+      ;(fetch-tray dh)
       ;(shove-tray-into-oven dh)
-      (send-kqml dh "PR2" "Boxy" "tray placed in oven")
+      ;(send-kqml dh "PR2" "Boxy" "tray placed in oven")
       (destroy-demo-handle dh))))
 
 (def-top-level-cram-function pizza-making-boxy ()
