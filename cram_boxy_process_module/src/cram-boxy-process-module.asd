@@ -37,6 +37,7 @@
                designators
                cram-language
                cram-plan-failures
+               cram-wsg50
                controller_manager_msgs-srv
                controller_manager_msgs-msg
                control_msgs-msg

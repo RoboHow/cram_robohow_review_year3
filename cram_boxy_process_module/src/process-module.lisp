@@ -34,7 +34,9 @@
   (right-arm nil)
   (left-arm nil)
   (left-arm-vel-mux nil)
-  (right-arm-vel-mux nil))
+  (right-arm-vel-mux nil)
+  (left-gripper nil)
+  (right-gripper nil))
   
 (defun init-boxy-pm-handle ()
   (let ((controller-manager
@@ -52,13 +54,18 @@
            "control_msgs/FollowJointTrajectoryAction"))
         (left-arm-vel-mux (init-mux-handle "/l_arm_vel/mux"))
         (right-arm-vel-mux (init-mux-handle "/r_arm_vel/mux"))
+        (right-gripper (cram-wsg50:make-wsg50-handle "/l_arm_gripper"))
+        (left-gripper (cram-wsg50:make-wsg50-handle "/r_arm_gripper"))
 
 )
     (make-boxy-pm-handle :controller-manager controller-manager
                          :right-arm right-arm-joint-controller
                          :left-arm left-arm-joint-controller
                          :left-arm-vel-mux left-arm-vel-mux
-                         :right-arm-vel-mux right-arm-vel-mux)
+                         :right-arm-vel-mux right-arm-vel-mux
+                         :left-gripper left-gripper
+                         :right-gripper right-gripper
+                         )
 ))
 
 (defun get-boxy-pm-handle ()
