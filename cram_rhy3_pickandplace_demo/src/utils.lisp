@@ -146,7 +146,8 @@ disables it (default)."
   (sem-map-coll-env:publish-semantic-map-collision-objects))
 
 (defun initialize-demo-setup-boxy (demo-handle)
-  (declare (ignorable demo-handle)))
+  (declare (ignorable demo-handle))
+  (select-rs-instance "pizza_demo"))
 
 (defun pose->trans (pose)
   `(,(cl-transforms:x (cl-transforms:origin pose))
