@@ -49,9 +49,9 @@
       (initialize-demo-setup dh :pr2 :enable-logging t)
       ;; TODO(all): Perform actual PR2 demo plans here
       ;; Do everything pizza-making related here before moving the tray
-      (fetch-spoon dh)
-      (fetch-tomato-sauce dh)
-      ;(fetch-tray dh)
+      ;(fetch-spoon dh)
+      ;(fetch-tomato-sauce dh)
+      (fetch-tray dh)
       ;(shove-tray-into-oven dh)
       ;(close-oven dh)
       ;(send-kqml dh "PR2" "Boxy" "tray placed in oven")
@@ -82,9 +82,13 @@
 ))
 
 (def-cram-function fetch-tray (demo-handle)
-  (in-front-of-island demo-handle
-    (try-forever
-      (pick-object (perceive-tray demo-handle) :stationary t))))
+  (go-in-front-of-island-2)
+  (look-onto-island)
+  (let ((tray (ensure-results (perceive-tray demo-handle))))
+    tray))
+  ;; perceive tray here.
+  ;(try-forever
+  ;  (pick-object (perceive-tray demo-handle) :stationary t)))
 
 (def-cram-function fetch-tomato-sauce (demo-handle)
   (let ((tomato-sauce (get-tomato-sauce demo-handle)))

@@ -578,12 +578,26 @@ throughout the demo experiment."
   (let* ((look-at-pose
            (cl-tf:make-pose-stamped
             "base_link" 0.0
-            (tf:make-3d-vector 0.8 0.0 0.5) ;; TODO: Correct me!
+            (tf:make-3d-vector 0.8 0.0 0.5)
             (tf:make-identity-rotation)))
-           ;; (cl-tf:make-pose-stamped
-           ;;  "map" 0.0
-           ;;  (tf:make-3d-vector 0.8 0.78 1.0) ;; TODO: Correct me!
-           ;;  (tf:make-identity-rotation)))
+         (look-at-pose-in-base-link
+           (cl-tf2:ensure-pose-stamped-transformed
+            *tf2*
+            look-at-pose
+            "base_link" :use-current-ros-time t)))
+    (with-designators
+        ((look-at (action
+                   `((desig-props::type desig-props::trajectory)
+                     (desig-props::to desig-props:see)
+                     (desig-props::pose ,look-at-pose-in-base-link)))))
+      (perform look-at))))
+
+(defun look-onto-island ()
+  (let* ((look-at-pose
+           (cl-tf:make-pose-stamped
+            "base_link" 0.0
+            (tf:make-3d-vector 0.8 0.0 0.5)
+            (tf:make-identity-rotation)))
          (look-at-pose-in-base-link
            (cl-tf2:ensure-pose-stamped-transformed
             *tf2*
@@ -639,6 +653,19 @@ throughout the demo experiment."
             "/map" 0.0
             (cl-transforms:make-pose
              (cl-transforms:make-3d-vector -0.323 1.137 0.0)
+             (cl-transforms:make-quaternion 0 0 1 0.03))))
+         (desig-props:in-front-of desig-props:island)))
+      t))
+
+(defun go-in-front-of-island-2 ()
+  (in-front-of
+      (desig:make-designator
+       'location
+       `((desig-props::pose
+          ,(cl-tf:pose->pose-stamped
+            "/map" 0.0
+            (cl-transforms:make-pose
+             (cl-transforms:make-3d-vector -0.323 1.337 0.0)
              (cl-transforms:make-quaternion 0 0 1 0.03))))
          (desig-props:in-front-of desig-props:island)))
       t))
