@@ -578,7 +578,7 @@ throughout the demo experiment."
   (let* ((look-at-pose
            (cl-tf:make-pose-stamped
             "map" 0.0
-            (tf:make-3d-vector 0.8 0.78 1.0)
+            (tf:make-3d-vector 0.8 0.78 1.0) ;; TODO: Correct me!
             (tf:make-identity-rotation)))
          (look-at-pose-in-base-link
            (cl-tf2:ensure-pose-stamped-transformed
@@ -683,6 +683,8 @@ throughout the demo experiment."
 ;;; Spoon
 ;;;
 
+;; IMPORTANT: COMPILE ME AFTER LOADING THE PACKAGE; OTHERWISE I WILL
+;; FAIL WITH A WEIRD ERROR!
 (defun perceive-spoon (demo-handle)
   (let* ((orig (dh-obj-spoon demo-handle))
          (object (ensure-results
@@ -719,15 +721,7 @@ throughout the demo experiment."
     (setf (slot-value desig 'desig:data) data)
     (setf (slot-value orig 'desig:successor) desig)
     (setf (slot-value desig 'desig:parent) orig)
-    ;desig
     object))
-
-;; (defun perceive-spoon-2 (demo-handle)
-;;   (let ((perceived-desigs 
-;;           (perceive-all (dh-obj-spoon demo-handle) :stationary t :move-head nil)))
-;;     (flet ((get-object-type (desig)
-;;              (second (find 'type (desig-prop-value desig 'desig-props::detection) :key #'car))))
-;;       (find "spoon" perceived-desigs :test #'string= :key #'get-object-type))))
 
 ;;;
 ;;; Ketchup
@@ -1028,73 +1022,77 @@ throughout the demo experiment."
                         :ay (/ pi -2)))))
             (go-in-front-of-fridge-2)
             (pr2-manip-pm::close-gripper :left)
-            (ensure-manipulation
-              (pr2-manip-pm::execute-move-arm-pose
-               :left (tf:make-pose-stamped
-                      "base_link" 0.0
-                      (tf:make-3d-vector 0.55 0.3 0.95)
-                      (tf:euler->quaternion :az (/ pi -2)))
-               :ignore-collisions t))
-            (ensure-manipulation
-              (pr2-manip-pm::execute-move-arm-pose
-               :left (tf:make-pose-stamped
-                      "base_link" 0.0
-                      (tf:make-3d-vector 0.55 -0.2 0.95)
-                      (tf:euler->quaternion :az (/ pi -2)))
-               :ignore-collisions t))
-            (ensure-arms-up :left)
-            (go-in-front-of-fridge-3)
-            (look-front-right)
-            (let ((tomato-sauce (ensure-results (perceive-tomato-sauce demo-handle))))
-              (setf pr2-manip-pm::*raise-elbow* nil)
-              (moveit::without-collision-objects
-                  `("HTTP://IAS.CS.TUM.EDU/KB/KNOWROB.OWL#DRAWER_FRIDGE_UPPER-0"
-                    "HTTP://IAS.CS.TUM.EDU/KB/KNOWROB.OWL#DRAWER_FRIDGE_UPPER-1"
-                    "HTTP://IAS.CS.TUM.EDU/KB/KNOWROB.OWL#DRAWER_FRIDGE_UPPER-2"
-                    "HTTP://IAS.CS.TUM.EDU/KB/KNOWROB.OWL#DRAWER_FRIDGE_UPPER-3"
-                    "HTTP://IAS.CS.TUM.EDU/KB/KNOWROB.OWL#DRAWER_FRIDGE_UPPER-4" ,(string (desig-prop-value tomato-sauce 'desig-props::name)))
-                (ensure-manipulation
-                  (cpl:with-failure-handling
-                      ((cram-plan-failures:object-not-found (f)
-                         (declare (ignore f))
-                         (cpl:retry)))
-                    (pr2-manip-pm::execute-move-arm-pose
-                     :right
-                     (tf:make-pose-stamped
-                      "base_link" 0.0
-                      (tf:make-3d-vector -0.1 -0.5 1.4)
-                      (tf:euler->quaternion :az (/ pi 2)))
-                     :ignore-collisions t)
-                    (pick-object
-                     tomato-sauce :stationary t :side :left))))
-              (setf pr2-manip-pm::*raise-elbow* t)
-              (pr2-manip-pm::execute-move-arm-pose
-               :right
-               (tf:make-pose-stamped
-                "base_link" 0.0
-                (tf:make-3d-vector -0.1 -0.5 1.4)
-                (tf:euler->quaternion :az (/ pi 2)))
-               :ignore-collisions t)
-              (go-in-front-of-fridge-4)
-              (pr2-manip-pm::execute-move-arm-pose
-               :right
-               (tf:make-pose-stamped
-                "base_link" 0.0
-                (tf:make-3d-vector -0.1 -0.8 1.4)
-                (tf:euler->quaternion)))
-              (pr2-manip-pm::execute-move-arm-pose
-               :right
-               (tf:make-pose-stamped
-                "base_link" 0.0
-                (tf:make-3d-vector 0.1 -0.8 1.2)
-                (tf:euler->quaternion)))
-              (pr2-manip-pm::execute-move-arm-pose
-               :right
-               (tf:make-pose-stamped
-                "base_link" 0.0
-                (tf:make-3d-vector 0.3 0.0 1.2)
-                (tf:euler->quaternion)))
-              tomato-sauce)))))))
+            (let ((log-id (first
+                           (cram-language::on-with-container-open-begin
+                            "drawer_fridge_upper_handle"))))
+              (ensure-manipulation
+                (pr2-manip-pm::execute-move-arm-pose
+                 :left (tf:make-pose-stamped
+                        "base_link" 0.0
+                        (tf:make-3d-vector 0.55 0.3 0.95)
+                        (tf:euler->quaternion :az (/ pi -2)))
+                 :ignore-collisions t))
+              (ensure-manipulation
+                (pr2-manip-pm::execute-move-arm-pose
+                 :left (tf:make-pose-stamped
+                        "base_link" 0.0
+                        (tf:make-3d-vector 0.55 -0.2 0.95)
+                        (tf:euler->quaternion :az (/ pi -2)))
+                 :ignore-collisions t))
+              (ensure-arms-up :left)
+              (go-in-front-of-fridge-3)
+              (look-front-right)
+              (let ((tomato-sauce (ensure-results (perceive-tomato-sauce demo-handle))))
+                (setf pr2-manip-pm::*raise-elbow* nil)
+                (moveit::without-collision-objects
+                    `("HTTP://IAS.CS.TUM.EDU/KB/KNOWROB.OWL#DRAWER_FRIDGE_UPPER-0"
+                      "HTTP://IAS.CS.TUM.EDU/KB/KNOWROB.OWL#DRAWER_FRIDGE_UPPER-1"
+                      "HTTP://IAS.CS.TUM.EDU/KB/KNOWROB.OWL#DRAWER_FRIDGE_UPPER-2"
+                      "HTTP://IAS.CS.TUM.EDU/KB/KNOWROB.OWL#DRAWER_FRIDGE_UPPER-3"
+                      "HTTP://IAS.CS.TUM.EDU/KB/KNOWROB.OWL#DRAWER_FRIDGE_UPPER-4" ,(string (desig-prop-value tomato-sauce 'desig-props::name)))
+                  (ensure-manipulation
+                    (cpl:with-failure-handling
+                        ((cram-plan-failures:object-not-found (f)
+                           (declare (ignore f))
+                           (cpl:retry)))
+                      (pr2-manip-pm::execute-move-arm-pose
+                       :right
+                       (tf:make-pose-stamped
+                        "base_link" 0.0
+                        (tf:make-3d-vector -0.1 -0.5 1.4)
+                        (tf:euler->quaternion :az (/ pi 2)))
+                       :ignore-collisions t)
+                      (pick-object
+                       tomato-sauce :stationary t :side :left))))
+                (setf pr2-manip-pm::*raise-elbow* t)
+                (cram-language::on-with-container-open-end log-id)
+                (pr2-manip-pm::execute-move-arm-pose
+                 :right
+                 (tf:make-pose-stamped
+                  "base_link" 0.0
+                  (tf:make-3d-vector -0.1 -0.5 1.4)
+                  (tf:euler->quaternion :az (/ pi 2)))
+                 :ignore-collisions t)
+                (go-in-front-of-fridge-4)
+                (pr2-manip-pm::execute-move-arm-pose
+                 :right
+                 (tf:make-pose-stamped
+                  "base_link" 0.0
+                  (tf:make-3d-vector -0.1 -0.8 1.4)
+                  (tf:euler->quaternion)))
+                (pr2-manip-pm::execute-move-arm-pose
+                 :right
+                 (tf:make-pose-stamped
+                  "base_link" 0.0
+                  (tf:make-3d-vector 0.1 -0.8 1.2)
+                  (tf:euler->quaternion)))
+                (pr2-manip-pm::execute-move-arm-pose
+                 :right
+                 (tf:make-pose-stamped
+                  "base_link" 0.0
+                  (tf:make-3d-vector 0.3 0.0 1.2)
+                  (tf:euler->quaternion)))
+                tomato-sauce))))))))
 
 (defun put-tomato-sauce-on-table (demo-handle tomato-sauce)
   (declare (ignore demo-handle))
@@ -1109,6 +1107,9 @@ throughout the demo experiment."
     (publish-pose target-pose)
     (ensure-manipulation
       (place-object tomato-sauce loc))))
+
+(define-hook cram-language::on-with-container-open-begin (container-name))
+(define-hook cram-language::on-with-container-open-end (log-id))
 
 (defun get-spoon (demo-handle)
   (go-in-front-of-drawer)
@@ -1174,27 +1175,31 @@ throughout the demo experiment."
              :right (cl-transforms:make-3d-vector -0.2 0.0 0.0) t))
           (move-base-relative-pose (cl-transforms:make-3d-vector
                                     -0.2 0.0 0.0))
-          ;; Grasp object here.
-          (look-into-drawer)
-          (let ((spoon (ensure-results (perceive-spoon demo-handle))))
-            (ensure-manipulation
-              (pick-object spoon :stationary t :side :left))
-            (ensure-manipulation
-              (move-arm-relative-pose
-               :right (cl-transforms:make-3d-vector 0.4 0.0 0.0) t))
-            (pr2-manip-pm::open-gripper :right)
-            (ensure-manipulation
-              (move-arm-relative-pose
-               :right (cl-transforms:make-3d-vector -0.2 0.0 0.0) t))
-            (ensure-arms-up)
-            spoon))))))
+          (let ((log-id (first
+                         (cram-language::on-with-container-open-begin
+                          "drawer_sinkblock_upper_handle"))))
+            ;; Grasp object here.
+            (look-into-drawer)
+            (let ((spoon (ensure-results (perceive-spoon demo-handle))))
+              (ensure-manipulation
+                (pick-object spoon :stationary t :side :left))
+              (ensure-manipulation
+                (move-arm-relative-pose
+                 :right (cl-transforms:make-3d-vector 0.4 0.0 0.0) t))
+              (pr2-manip-pm::open-gripper :right)
+              (ensure-manipulation
+                (move-arm-relative-pose
+                 :right (cl-transforms:make-3d-vector -0.2 0.0 0.0) t))
+              (ensure-arms-up)
+              (cram-language::on-with-container-open-end log-id)
+              spoon)))))))
 
 (defun put-spoon-on-table (demo-handle spoon)
   (declare (ignorable demo-handle))
   (let ((spoon-putdown-pose
           (tf:make-pose-stamped
            "map" 0.0
-           (tf:make-3d-vector -1.0 1.0 0.9)
+           (tf:make-3d-vector -1.0 1.0 0.85)
            (tf:euler->quaternion
             :ax pi :az pi))))
     (go-in-front-of-island-2)

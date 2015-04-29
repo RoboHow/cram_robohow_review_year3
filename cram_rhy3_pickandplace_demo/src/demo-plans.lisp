@@ -46,13 +46,14 @@
   (start-node)
   (with-process-modules-pr2
     (let ((dh (get-demo-handle)))
-      (initialize-demo-setup dh :pr2)
+      (initialize-demo-setup dh :pr2 :enable-logging t)
       ;; TODO(all): Perform actual PR2 demo plans here
       ;; Do everything pizza-making related here before moving the tray
-      ;(fetch-spoon dh)
+      (fetch-spoon dh)
       (fetch-tomato-sauce dh)
       ;(fetch-tray dh)
       ;(shove-tray-into-oven dh)
+      ;(close-oven dh)
       ;(send-kqml dh "PR2" "Boxy" "tray placed in oven")
       (destroy-demo-handle dh))))
 
