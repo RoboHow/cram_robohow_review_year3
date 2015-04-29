@@ -76,6 +76,10 @@
                       `(at ,(make-designator
                              'location
                              `((pose ,value)))))
+                     ((eql key 'desig-props::detection)
+                      (let* ((type-string (second (find 'type value :key #'car))))
+                        `(,(intern "TYPE" 'desig-props)
+                          ,(intern (string-upcase type-string) 'desig-props))))
                      (t `(,key ,value))))))
     (cpl:mapcar-clean
      (lambda (result)
@@ -90,6 +94,12 @@
                                   (description result))))))))
      results)))
 
+(defun filter-results-on-type (request-desig response-desigs)
+  (alexandria:when-let ((request-type (desig-prop-value request-desig 'type)))
+    (remove-if-not 
+     (lambda (type) (eql request-type type)) response-desigs
+     :key (lambda (desig) (desig-prop-value desig 'desig-props:type)))))
+
 (defun call-perception-function (object-designator)
   (let ((results
           (uima:get-uima-result
@@ -98,7 +108,7 @@
     (unless results
       (cpl:fail 'cram-plan-failures:object-not-found
                 :object-desig object-designator))
-    (post-process-results results)))
+    (filter-results-on-type object-designator (post-process-results results))))
 
 (def-action-handler perceive (object-designator)
   (ros-info (perception) "Perceiving object.")
