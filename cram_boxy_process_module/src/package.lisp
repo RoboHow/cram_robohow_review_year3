@@ -37,4 +37,5 @@
   (:export boxy-process-module init-boxy-pm-handle cleanup-boxy-pm-handle
            boxy-pm-handle boxy-controller-manager boxy-right-arm
            stop-controllers ensure-vel-controllers ensure-pos-controllers
-           move-arm-config get-right-arm-joint-names get-left-arm-joint-names))
+           move-arm-config get-right-arm-joint-names get-left-arm-joint-names)
+  (:desig-properties :to :follow :pose))

@@ -36,7 +36,8 @@
   (left-arm-vel-mux nil)
   (right-arm-vel-mux nil)
   (left-gripper nil)
-  (right-gripper nil))
+  (right-gripper nil)
+  (ptu nil))
   
 (defun init-boxy-pm-handle ()
   (let ((controller-manager
@@ -56,7 +57,8 @@
         (right-arm-vel-mux (init-mux-handle "/r_arm_vel/mux"))
         (right-gripper (cram-wsg50:make-wsg50-handle "/l_arm_gripper"))
         (left-gripper (cram-wsg50:make-wsg50-handle "/r_arm_gripper"))
-
+        (ptu (actionlib-lisp:make-simple-action-client
+              "/ptu" "iai_control_msgs/PTUAction"))
 )
     (make-boxy-pm-handle :controller-manager controller-manager
                          :right-arm right-arm-joint-controller
@@ -65,6 +67,7 @@
                          :right-arm-vel-mux right-arm-vel-mux
                          :left-gripper left-gripper
                          :right-gripper right-gripper
+                         :ptu ptu
                          )
 ))
 
@@ -97,6 +100,14 @@
     (move-arm-config controller joint-names config time))
   (ros-info (boxy-pm) "Moving done."))
 
+(def-action-handler look-at (pose &optional (timeout 5.0))
+  (ros-info (boxy-pm) "Looking at pose ~a" pose)
+  (let* ((ptu (boxy-ptu (get-boxy-pm-handle))))
+    (actionlib-lisp:send-goal-and-wait 
+     ptu (actionlib-lisp:make-action-goal-msg ptu
+           :mode 0 :pose (cl-tf:pose-stamped->msg pose))
+     timeout 1.0)))  
+
 (def-process-module boxy-process-module (desig)
   (apply #'call-action (reference desig)))
 
@@ -106,19 +117,28 @@
     (desig::action-desig? ?designator)
     (desig-prop ?designator (:to :move))
     (desig-prop ?designator (:arm ?side))
-    (desig-prop ?designator (:config ?config))))
+    (desig-prop ?designator (:config ?config)))
+
+  (<- (action-desig ?designator (look-at ?pose))
+    (desig::action-desig? ?designator)
+    (desig-prop ?designator (to follow))
+    (desig-prop ?designator (pose ?pose)))
+                    
+)
 
 (def-fact-group boxy-process-module (matching-process-module available-process-module)
 
   (<- (matching-process-module ?designator boxy-process-module)
-    (or (format "2")
-        (desig-prop ?designator (:to :home))
-        (format "3")
-        (desig-prop ?designator (:arm ?_))
-        (format "4")
-        (desig-prop ?designator (:config ?_)
-                    )
-        (format "5")))
-                     
+    (desig::action-desig? ?designator)
+    (or 
+     (and 
+      (desig-prop ?designator (:to :home))
+      (desig-prop ?designator (:arm ?_))
+      (desig-prop ?designator (:config ?_)))
+     (and
+      (desig-prop ?designator (to follow))
+      (desig-prop ?designator (pose ?pose))
+      )))
+                           
   (<- (available-process-module boxy-process-module)
     (crs:true)))

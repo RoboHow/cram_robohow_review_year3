@@ -41,7 +41,8 @@
                controller_manager_msgs-srv
                controller_manager_msgs-msg
                control_msgs-msg
-               topic_tools-srv)
+               topic_tools-srv
+               iai_control_msgs-msg)
   :components
   ((:file "package")
    (:file "controller-manager" :depends-on ("package"))
