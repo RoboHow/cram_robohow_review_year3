@@ -55,12 +55,12 @@
            "control_msgs/FollowJointTrajectoryAction"))
         (left-arm-joint-controller
           (actionlib-lisp:make-simple-action-client
-           "/r_arm_traj_controller/follow_joint_trajectory"
+           "/l_arm_traj_controller/follow_joint_trajectory"
            "control_msgs/FollowJointTrajectoryAction"))
         (left-arm-vel-mux (init-mux-handle "/l_arm_vel/mux"))
         (right-arm-vel-mux (init-mux-handle "/r_arm_vel/mux"))
-        (right-gripper (cram-wsg50:make-wsg50-handle "/l_arm_gripper"))
-        (left-gripper (cram-wsg50:make-wsg50-handle "/r_arm_gripper"))
+        (right-gripper (cram-wsg50:make-wsg50-handle "/right_arm_gripper"))
+        (left-gripper (cram-wsg50:make-wsg50-handle "/left_arm_gripper"))
         (ptu (actionlib-lisp:make-simple-action-client
               "/ptu" "iai_control_msgs/PTUAction"))
 )
@@ -141,8 +141,17 @@
            :mode 0 :pose (cl-tf:pose-stamped->msg pose))
      timeout 1.0)))  
 
-(def-action-handler grasp (side pre-config)
-  (arm-joint-move side pre-config))
+(def-action-handler grasp-object (side pre-config)
+  (format t "in grasping function~%")
+  (let* ((handle (get-boxy-pm-handle))
+         (gripper (ecase side
+                   (:left (boxy-left-gripper handle))
+                   (:right (boxy-right-gripper handle)))))
+    (cram-wsg50:move-wsg50 gripper 110 60 20)
+    (cpl::sleep 1)
+    (arm-joint-move side pre-config)
+    (cram-wsg50:move-wsg50 gripper 5 60 20)
+    (cpl:sleep 3)))
 
 ;;;
 ;;; PROLOG FACTS
@@ -157,24 +166,36 @@
     (desig-prop ?designator (arm right))
     (equal ?config (-1.25 -1.23 -0.29 -2.1 0.4 0.58 0.13)))
 
+  (<- (action-desig ?designator (arm-joint-move :left ?config)) 
+    (desig::action-desig? ?designator)
+    (desig-prop ?designator (type trajectory))
+    (desig-prop ?designator (to park))
+    (desig-prop ?designator (arm left))
+    (equal ?config (-2.13 -0.93 0.45 -1.89 -0.15 0.1 1.3)))
+
   (<- (action-desig ?designator (look-at ?pose))
     (desig::action-desig? ?designator)
     (desig-prop ?designator (type trajectory))
     (desig-prop ?designator (to follow))
     (desig-prop ?designator (pose ?pose)))
       
-  (<- (action-desig ?designator (grasp ?side ?pre-config))
+  (<- (action-desig ?designator (grasp-object ?side ?pre-config))
     (desig::action-desig? ?designator)
     (desig-prop ?designator (type trajectory))
     (desig-prop ?designator (to grasp))
+    (format "in grasping pattern~%")
     (desig-prop ?designator (obj ?obj))
+    (format "a")
     (current-designator ?obj ?current-obj)
+    (format "b")
     (obj-desig? ?current-obj)
+    (format "c")
     (desig-prop ?current-obj (type spoon))
+    (format "d")
     (equal ?side :right)
-    (equal ?pre-config (-1.47 0.98 -1.2 -1.9 0.26 0.0 1.1)))
-           
-                                 
+    (format "e")
+    (equal ?pre-config (-1.47 0.98 -1.2 -1.9 0.26 0.0 1.1))
+    (format "f"))
 )
 
 (def-fact-group boxy-process-module (matching-process-module available-process-module)
