@@ -51,9 +51,11 @@
       ;(fetch-spoon dh)
       ;(fetch-tomato-sauce dh)
       (fetch-tray dh)
-      ;(shove-tray-into-oven dh)
-      ;(close-oven dh)
-      ;(send-kqml dh "PR2" "Boxy" "tray placed in oven")
+      (tray-into-oven dh)
+      (close-oven dh)
+      ;;(shove-tray-into-oven dh)
+      ;;(close-oven dh)
+      ;;(send-kqml dh "PR2" "Boxy" "tray placed in oven")
       (destroy-demo-handle dh))))
 
 (def-top-level-cram-function pizza-making-boxy ()
@@ -96,13 +98,21 @@
       )))
 
 (def-cram-function fetch-tray (demo-handle)
-  (go-in-front-of-island-2)
+  (in-front-of
+      (desig:make-designator
+       'location
+       `((desig-props::pose
+          ,(cl-tf:pose->pose-stamped
+            "/map" 0.0
+            (cl-transforms:make-pose
+             (cl-transforms:make-3d-vector -0.354 1.4 0.0)
+             (cl-transforms:make-quaternion 0 0 1 0))))
+         (desig-props:in-front-of desig-props:island)))
+      nil)
   (look-onto-island)
   (let ((tray (ensure-results (perceive-tray demo-handle))))
-    tray))
-  ;; perceive tray here.
-  ;(try-forever
-  ;  (pick-object (perceive-tray demo-handle) :stationary t)))
+    (try-forever
+      (pick-object tray :stationary t))))
 
 (def-cram-function fetch-tomato-sauce (demo-handle)
   (let ((tomato-sauce (get-tomato-sauce demo-handle)))
@@ -113,19 +123,20 @@
     (put-spoon-on-table demo-handle spoon)))
 
 (def-cram-function shove-tray-into-oven (demo-handle)
-  (in-front-of-oven demo-handle
-    (look-at-marker-suitable-pose)
-    (let ((perceived-markers (ensure-results
-                              (lambda ()
-                                (perceive-markers demo-handle)))))
-      (ros-info (rh demo) "Found ~a marker(s)~%"
-                (length perceived-markers))
-      (labels ((marker-relative-pose (relative-pose)
-                 (markers-relative-pose->absolute-poses
-                  demo-handle perceived-markers relative-pose)))
-        (publish-pose (first (marker-relative-pose
-                              (cl-transforms:make-identity-pose)))
-                      "/marker")))))
+  (in-front-of-oven demo-handle)
+  (lift-arms-to 1.2))
+  ;; (look-at-marker-suitable-pose)
+  ;; (let ((perceived-markers (ensure-results
+  ;;                            (lambda ()
+  ;;                              (perceive-markers demo-handle)))))
+  ;;   (ros-info (rh demo) "Found ~a marker(s)~%"
+  ;;             (length perceived-markers))
+  ;;   (labels ((marker-relative-pose (relative-pose)
+  ;;              (markers-relative-pose->absolute-poses
+  ;;               demo-handle perceived-markers relative-pose)))
+  ;;     (publish-pose (first (marker-relative-pose
+  ;;                           (cl-transforms:make-identity-pose)))
+  ;;                   "/marker"))))
 
 (def-cram-function track-human (demo-handle)
   (wait-for-kqml-message

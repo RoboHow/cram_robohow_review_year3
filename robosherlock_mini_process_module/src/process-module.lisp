@@ -111,7 +111,7 @@
     (filter-results-on-type object-designator (post-process-results results))))
 
 (def-action-handler perceive (object-designator)
-  (ros-info (perception) "Perceiving object.")
+  (ros-info (perception) "Perceiving object with mini-pm.")
   (call-perception-function object-designator))
 
 (def-process-module robosherlock-mini-process-module (desig)

@@ -103,8 +103,12 @@
                   ?handles))
   
   (<- (infer-object-property ?object desig-props:type desig-props:tray)
-    (object-color ?object desig-props:black ?black)
-    (> ?black 0.7))
+    ;;(object-color ?object desig-props:black ?black)
+    ;;(> ?black 0.7))
+    (desig-prop ?object (desig-props::detection ?detection))
+    (crs:lisp-fun detection-has-type ?detection "tray"))
+
+    ;;(desig-prop ?object (desig-props::shape "flat")))
   
   (<- (infer-object-property ?object desig-props:type desig-props:spoon)
     (desig-prop ?object (desig-props:response ?response))

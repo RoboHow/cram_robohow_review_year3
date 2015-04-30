@@ -768,20 +768,21 @@ throughout the demo experiment."
 ;;;
 
 (defun perceive-tray (demo-handle)
-  (let ((trays (perceive-all (dh-obj-tray demo-handle)
-                             :stationary t
-                             :move-head nil)))
-    (labels ((area-of-object (object)
-               (let* ((segment (desig-prop-value object 'segment))
-                      (dimensions-2d (cadr (assoc 'dimensions-2d segment))))
-                 (* (elt dimensions-2d 0) (elt dimensions-2d 1)))))
-      (let ((tray
-              (find (loop for tray in trays
-                          maximizing (area-of-object tray))
-                    trays :test (lambda (area object)
-                                  (equal area (area-of-object object))))))
-        (when tray
-          (equate (dh-obj-tray demo-handle) tray))))))
+  (let* ((trays (perceive-all (dh-obj-tray demo-handle)
+                              :stationary t
+                              :move-head nil))
+         (tray
+           (first
+            (cpl:mapcar-clean
+             (lambda (obj)
+               (let ((detection (desig-prop-value
+                                 obj 'desig-props::detection)))
+                 (when (string=
+                        (cadr (assoc 'desig-props:type detection))
+                        "tray")
+                   obj)))
+             trays))))
+    tray))
 
 ;;;
 ;;; Drawer and Fridge
@@ -1281,6 +1282,114 @@ throughout the demo experiment."
 (defun start-node ()
   (roslisp-utilities:startup-ros)
   (select-rs-instance "handles"))
+
+(defun get-global-link-pose (link)
+  (cl-tf2:ensure-pose-stamped-transformed
+   *tf2* (tf:pose->pose-stamped link 0.0 (tf:make-identity-pose))
+   "map" :use-current-ros-time t))
+
+(defun align-arm-heights (source-arm)
+  (let* ((target-arm (if (eql source-arm :left) :right :left))
+         (target-link (case target-arm
+                        (:left "l_wrist_roll_link")
+                        (:right "r_wrist_roll_link")))
+         (source-link (case source-arm
+                        (:left "l_wrist_roll_link")
+                        (:right "r_wrist_roll_link")))
+         (target-pose (get-global-link-pose target-link))
+         (source-pose (get-global-link-pose source-link))
+         (new-target-pose
+           (tf:copy-pose-stamped
+            target-pose
+            :origin (tf:make-3d-vector
+                     (tf:x (tf:origin target-pose))
+                     (tf:y (tf:origin target-pose))
+                     (+ (tf:z (tf:origin source-pose)) 0.1)))))
+    (pr2-manip-pm::execute-move-arm-pose
+     target-arm new-target-pose
+     :ignore-collisions t
+     :ignore-position-check t)))
+
+(defun lift-arms-to (height)
+  (let* ((left (get-global-link-pose "l_wrist_roll_link"))
+         (right (get-global-link-pose "r_wrist_roll_link"))
+         (left-h (tf:copy-pose-stamped
+                  left :origin (tf:make-3d-vector
+                                (tf:x (tf:origin left))
+                                (tf:y (tf:origin left))
+                                height)))
+         (right-h (tf:copy-pose-stamped
+                   right :origin (tf:make-3d-vector
+                                  (tf:x (tf:origin right))
+                                  (tf:y (tf:origin right))
+                                  height))))
+    
+    (moveit:execute-trajectories
+     (mapcar (lambda (arm pose-stamped)
+               (pr2-manip-pm::arm-pose->trajectory
+                arm pose-stamped
+                :ignore-collisions t))
+             `(:left :right)
+             `(,left-h ,right-h))
+     :ignore-va t)))
+
+(defun linear-transform-pose-stamped (pose-stamped vector)
+  (tf:copy-pose-stamped
+   pose-stamped
+   :origin (tf:v+ vector (tf:origin pose-stamped))))
+
+(defun pr2-dual-arm-linear-relative-movement (vector)
+  (let* ((left (get-global-link-pose "l_wrist_roll_link"))
+         (right (get-global-link-pose "r_wrist_roll_link"))
+         (left-transformed (linear-transform-pose-stamped
+                            left vector))
+         (right-transformed (linear-transform-pose-stamped
+                             right vector)))
+    (moveit:execute-trajectories
+     (mapcar (lambda (arm pose-stamped)
+               (pr2-manip-pm::arm-pose->trajectory
+                arm pose-stamped
+                :ignore-collisions t))
+             `(:left :right)
+             `(,left-transformed ,right-transformed))
+     :ignore-va t)))
+
+(defun pr2-single-arm-linear-relative-movement (arm vector)
+  (let* ((pose (get-global-link-pose
+                (case arm
+                  (:left "l_wrist_roll_link")
+                  (:right "r_wrist_roll_link"))))
+         (transformed (linear-transform-pose-stamped
+                       pose vector)))
+    (pr2-manip-pm::execute-move-arm-pose
+     arm transformed
+     :ignore-collisions t)))
+
+(defun tray-into-oven (demo-handle)
+  (lift-arms-to 1.35)
+  (align-arm-heights :left)
+  (in-front-of-oven demo-handle)
+  (in-front-of (make-designator
+                'location
+                `((desig-props:pose
+                   ,(tf:make-pose-stamped
+                     "map" 0.0
+                     (tf:make-3d-vector 0.513 1.881 0.0)
+                     (tf:make-quaternion 0 0 0 1)))))
+      nil)
+  (lift-arms-to 1.30)
+  (pr2-manip-pm::open-gripper :right)
+  (pr2-single-arm-linear-relative-movement
+   :right (tf:make-3d-vector -0.4 0.0 0.0))
+  (pr2-single-arm-linear-relative-movement
+   :right (tf:make-3d-vector 0.0 0.25 0.0))
+  (pr2-single-arm-linear-relative-movement
+   :right (tf:make-3d-vector 0.02 0.0 0.0))
+  (pr2-manip-pm::open-gripper :left)
+  (pr2-single-arm-linear-relative-movement
+   :right (tf:make-3d-vector 0.1 0.0 0.05))
+  (pr2-single-arm-linear-relative-movement
+   :left (tf:make-3d-vector -0.1 0.0 0.05)))
 
 (defun close-oven (demo-handle)
   (in-front-of-oven demo-handle)
