@@ -32,6 +32,7 @@
   
   :depends-on (roslisp
                actionlib-lisp
+               cl-tf
                alexandria
                process-modules
                designators

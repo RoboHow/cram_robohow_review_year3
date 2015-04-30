@@ -65,7 +65,7 @@
       (select-rs-instance "pizza_demo")
       (wait-for-kqml-message
        dh "PR2" "Boxy" "spoon on counter")
-      (grasp-spoon demo-handle)
+      (grasp-spoon dh)
       ;; TODO(all): Perform actual Boxy demo plans here
 
       ;(human-tracking) ;; This happens after everything else and triggers tracking of the human. It automatically waits for the PR2 to report that the tray was shoven into the oven.

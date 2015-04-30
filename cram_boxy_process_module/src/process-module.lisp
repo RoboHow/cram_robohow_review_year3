@@ -37,6 +37,8 @@
   (controller-manager nil)
   (right-arm nil)
   (left-arm nil)
+  (right-arm-cart nil)
+  (left-arm-cart nil)
   (left-arm-vel-mux nil)
   (right-arm-vel-mux nil)
   (left-gripper nil)
@@ -63,6 +65,10 @@
         (left-gripper (cram-wsg50:make-wsg50-handle "/left_arm_gripper"))
         (ptu (actionlib-lisp:make-simple-action-client
               "/ptu" "iai_control_msgs/PTUAction"))
+        (left-arm-cart (init-cartesian-controller-handle
+                        "/l_arm_cart_controller"))
+        (right-arm-cart (init-cartesian-controller-handle
+                        "/r_arm_cart_controller"))
 )
     (make-boxy-pm-handle :controller-manager controller-manager
                          :right-arm right-arm-joint-controller
@@ -72,6 +78,8 @@
                          :left-gripper left-gripper
                          :right-gripper right-gripper
                          :ptu ptu
+                         :left-arm-cart left-arm-cart
+                         :right-arm-cart right-arm-cart
                          )
 ))
 
@@ -132,6 +140,26 @@
     (ensure-pos-controllers (boxy-controller-manager handle))
     (move-arm-config controller joint-names config time))
   (ros-info (boxy-pm) "Moving done."))
+
+(defun arm-cart-move (side goal-pose ee-frame &optional (timeout 5.0))
+  (ros-info (boxy-pm) "Moving ~a arm to pose ~a" side goal-pose)
+  (let* ((handle (get-boxy-pm-handle))
+         (mux (ecase side
+               (:left (boxy-left-arm-vel-mux handle))
+               (:right (boxy-right-arm-vel-mux handle))))
+         (controller (ecase side
+                       (:left (boxy-left-arm-cart handle))
+                       (:right (boxy-right-arm-cart handle))))
+         (controller-out-topic (cart-out-topic controller))
+         (state-fluent (cart-state-fluent controller)))
+    (switch-mux mux controller-out-topic)
+    (cpl-impl:pursue
+      (cpl:sleep timeout)
+      (cpl-impl:seq
+        (move-cart controller goal-pose ee-frame)
+        (cpl-impl:wait-for (cpl-impl:fl-funcall #'cart-controller-finished-p state-fluent)))
+      (cpl-impl:whenever ((cpl:pulsed state-fluent))
+        (move-cart controller goal-pose ee-frame)))))
 
 (def-action-handler look-at (pose &optional (timeout 5.0))
   (ros-info (boxy-pm) "Looking at pose ~a" pose)
