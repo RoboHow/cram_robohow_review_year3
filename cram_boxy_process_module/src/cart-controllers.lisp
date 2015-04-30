@@ -60,6 +60,12 @@
             :pose (cl-tf:pose-stamped->msg goal-pose)
             :ee_frame_name ee-frame)))
 
+(defun stop-cartesian-controller (handle)
+  (publish (cart-command-pub handle)
+           (make-message 
+            "iai_control_msgs/CartGoal"
+            :ee_frame_name "__STOP")))
+
 (defun cart-controller-finished-p (controller-state
                                    &optional (vel-thresh 0.1) (pos-error-thresh 0.03))
   (and (getf controller-state :running)
