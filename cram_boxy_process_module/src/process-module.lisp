@@ -150,14 +150,14 @@
          (controller (ecase side
                        (:left (boxy-left-arm-cart handle))
                        (:right (boxy-right-arm-cart handle))))
-         (controller-out-topic (cart-out-topic controller))
          (state-fluent (cart-state-fluent controller)))
-    (switch-mux mux controller-out-topic)
+    (switch-mux mux (cart-out-topic controller))
+    (ensure-vel-controllers (boxy-controller-manager handle))
     (cpl-impl:pursue
-      (cpl:sleep timeout)
-      (cpl-impl:seq
-        (move-cart controller goal-pose ee-frame)
-        (cpl-impl:wait-for (cpl-impl:fl-funcall #'cart-controller-finished-p state-fluent)))
+      (cpl-impl:seq 
+        (cpl:sleep timeout)
+        (cpl:fail 'cram-plan-failures:manipulation-pose-unreachable))
+      (cpl-impl:wait-for (cpl-impl:fl-funcall #'cart-controller-finished-p state-fluent))
       (cpl-impl:whenever ((cpl:pulsed state-fluent))
         (move-cart controller goal-pose ee-frame)))))
 
