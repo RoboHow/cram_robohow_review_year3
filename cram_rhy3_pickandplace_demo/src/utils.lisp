@@ -657,18 +657,18 @@ throughout the demo experiment."
          (desig-props:in-front-of desig-props:island)))
       t))
 
-(defun go-in-front-of-island-2 ()
-  (in-front-of
-      (desig:make-designator
-       'location
-       `((desig-props::pose
-          ,(cl-tf:pose->pose-stamped
-            "/map" 0.0
-            (cl-transforms:make-pose
-             (cl-transforms:make-3d-vector -0.323 1.337 0.0)
-             (cl-transforms:make-quaternion 0 0 1 0.03))))
-         (desig-props:in-front-of desig-props:island)))
-      t))
+;; (defun go-in-front-of-island-2 ()
+;;   (in-front-of
+;;       (desig:make-designator
+;;        'location
+;;        `((desig-props::pose
+;;           ,(cl-tf:pose->pose-stamped
+;;             "/map" 0.0
+;;             (cl-transforms:make-pose
+;;              (cl-transforms:make-3d-vector -0.323 1.337 0.0)
+;;              (cl-transforms:make-quaternion 0 0 1 0.03))))
+;;          (desig-props:in-front-of desig-props:island)))
+;;       t))
 
 (defun go-in-front-of-fridge ()
   (in-front-of (make-designator
