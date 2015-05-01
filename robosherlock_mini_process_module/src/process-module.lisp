@@ -121,8 +121,9 @@
 
 (def-fact-group robosherlock-mini-action-designators (action-desig)
   (<- (robosherlock-mini-pm-running?)
-    (desig::lisp-pred cram-process-modules::get-running-process-module
-                      robosherlock-mini-process-module))
+    (desig::lisp-pred 
+     cram-process-modules::get-running-process-module
+     robosherlock-mini-process-module))
 
   (<- (action-desig ?designator (perceive ?object-desig))
     (robosherlock-mini-pm-running?)
