@@ -49,4 +49,5 @@
    (:file "controller-manager" :depends-on ("package"))
    (:file "pos-controllers" :depends-on ("package"))
    (:file "vel-mux" :depends-on ("package"))
-   (:file "process-module" :depends-on ("package" "vel-mux"))))
+   (:file "cart-controllers" :depends-on ("package"))
+   (:file "process-module" :depends-on ("package" "vel-mux" "cart-controllers"))))
