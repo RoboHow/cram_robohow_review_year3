@@ -34,7 +34,10 @@
                actionlib-lisp
                cram-boxy-process-module
                lasa_perception_module-srv
-               lasa_action_planners-msg)
+               lasa_action_planners-msg
+               cram-language-designator-support
+               cram-plan-library)
   :components
   ((:file "package")
+   (:file "process-module" :depends-on ("package"))
    (:file "demo-handle" :depends-on ("package"))))

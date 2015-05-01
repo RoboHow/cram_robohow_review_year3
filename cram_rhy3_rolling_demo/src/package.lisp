@@ -27,5 +27,9 @@
 
 (in-package :cl-user)
 
-(defpackage cram-rolling-demo
-  (:use #:common-lisp #:roslisp))
+(desig-props:def-desig-package cram-rolling-demo
+  (:use #:common-lisp #:roslisp #:cram-process-modules #:desig)
+  (:import-from #:cram-reasoning #:<- #:def-fact-group)
+  (:import-from #:cram-language def-cram-function def-top-level-cram-function top-level)
+  (:import-from :cram-language-designator-support with-designators)
+  (:desig-properties #:to #:perceive #:obj #:roll #:some #:stuff #:type #:trajectory))

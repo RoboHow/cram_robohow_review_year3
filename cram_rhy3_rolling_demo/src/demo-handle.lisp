@@ -70,7 +70,26 @@
   (unless *handle*
     (setf *handle* (init-rolling-demo)))
   *handle*)
+
+;;;
+;;; PLANS
+;;;
+
+(def-top-level-cram-function rolling-demo ()
+  (with-designators ((dough (object '((some stuff))))
+                     (rolling-action (action `((type trajectory)
+                                               (to roll)
+                                               (obj ,dough)))))
+    ; (loop while ...
+    (with-process-modules-running (lasa-process-module)
+      (plan-lib:perceive-object 'plan-lib:currently-visible dough)
+      (plan-lib:perform rolling-action))))
     
+
+;;;
+;;; ORIGINAL SCRIPT
+;;;
+
 (defun main ()
   (let ((desired-area 0.2)
         (area 0.0)
