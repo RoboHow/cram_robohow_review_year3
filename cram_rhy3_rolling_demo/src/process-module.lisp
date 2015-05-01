@@ -39,24 +39,27 @@
 
 (def-action-handler lasa-perceive (object-designator)
   (ros-info (lasa-pm) "Perceiving dough with LASA perception")
-  (with-fields ((area-val area) (dough-p dough_found)
+  (with-fields ((size area) (dough-p dough_found)
                 (object-frame object_frame) (reach-center reach_center_attractor)
                 (reach-corner reach_corner_attractor) (roll-attractor roll_attractor)
                 (back-attractor back_attractor))
       (call-lasa-perception (get-handle))
-    ;; TODO: values: msg->LISP
+    (format t "hu~%")
     (if dough-p
         (copy-designator object-designator
                          :new-description 
-                         `((size ,area-val) (object-frame ,object-frame) 
-                           (reach-center ,reach-center) (reacher-corner ,reach-corner) 
+                         `((size ,size) (object-frame ,object-frame) 
+                           (reach-center ,reach-center) (reach-corner ,reach-corner) 
                            (roll-attractor ,roll-attractor) (back-attractor ,back-attractor)))
         (cpl:fail 'cram-plan-failures:object-not-found))))
-                                       
-(def-action-handler lasa-roll (object-designator)
+
+(def-action-handler lasa-control (action-desig action-type action-name 
+                                               object-frame attractor-frame force-gmm)
   (ros-info (lasa-pm) "Rolling dough with LASA controllers")
-  ; IMPLEMENT ME
-)
+  (format t "desig: ~a~%type: ~a~%name: ~a~%object-frame: ~a~%attractor-frame: ~a~%force-gmm: ~a~%"
+          action-desig action-type action-name object-frame attractor-frame force-gmm)
+  (call-lasa-controller (get-handle) action-type action-name object-frame
+                        attractor-frame force-gmm))
 
 (def-fact-group lasa-process-module-action-designators (action-desig)
 
@@ -64,26 +67,66 @@
     (desig::lisp-pred get-running-process-module lasa-process-module))
 
   (<- (some-stuff-desig? ?desig)
-    (current-designator ?desig ?current-desig)
-    (obj-desig? ?current-desig)
-    (desig-prop ?current-desig (some stuff)))
+    (obj-desig? ?desig)
+    (desig-prop ?desig (some stuff)))
 
-  (<- (action-desig ?desig (lasa-perceive ?current-obj-desig))
+  (<- (action-desig ?desig (lasa-perceive ?current-desig))
     (lasa-pm-running?)
     (desig-prop ?desig (to perceive))
     (desig-prop ?desig (obj ?obj-desig))
-    (some-stuff-desig? ?obj-desig))
+    (current-designator ?obj-desig ?current-desig)
+    (some-stuff-desig? ?current-desig))
 
-  (<- (action-desig ?desig (lasa-roll ?current-obj-desig))
+  (<- (action-desig ?desig (lasa-control ?current-desig "LEARNED_MODEL" "reach" 
+                                         ?object-frame ?attractor-frame ""))
     (lasa-pm-running?)
-    ; trajectory-desig?
-    (current-designator ?desig ?current-designator)
+    (desig:trajectory-desig? ?desig)
+    (current-designator ?desig ?current-desig)
+    (desig-prop ?current-desig (to reach))
+    (desig-prop ?current-desig (obj ?obj-desig))
+    (current-designator ?obj-desig ?current-obj-desig)
+    (some-stuff-desig? ?current-obj-desig)
+    (desig-prop ?current-obj-desig (object-frame ?object-frame))
+    (desig-prop ?current-desig (iteration ?iteration))
+    (crs:once
+     (or 
+      (and
+       (desig::lisp-pred < ?iteration 3)
+       (desig-prop ?current-obj-desig (reach-center ?attractor-frame)))
+      (desig-prop ?current-obj-desig (reach-corner ?attractor-frame)))))
+
+  (<- (action-desig ?desig (lasa-control ?current-desig "LEARNED_MODEL" "roll" 
+                                         ?object-frame ?attractor-frame ?force-gmm))
+    (lasa-pm-running?)
+    (desig:trajectory-desig? ?desig)
+    (current-designator ?desig ?current-desig)
     (desig-prop ?current-desig (to roll))
     (desig-prop ?current-desig (obj ?obj-desig))
-    (some-stuff-desig? ?obj-desig)
-    ; her reasoning
-)
+    (current-designator ?obj-desig ?current-obj-desig)
+    (some-stuff-desig? ?current-obj-desig)
+    (desig-prop ?current-obj-desig (object-frame ?object-frame))
+    (desig-prop ?current-obj-desig (roll-attractor ?attractor-frame))
+    (desig-prop ?current-obj-desig (size ?size))
+    (crs:once
+     (or
+      (and (desig::lisp-pred < ?size 0.015) 
+           (equal ?force-gmm "first"))
+      (and (desig::lisp-pred < 0.015 ?size)
+           (desig::lisp-pred < ?size 0.03)
+           (equal ?force-gmm "mid"))
+      (equal ?force-gmm "last"))))
 
+  (<- (action-desig ?desig (lasa-control ?current-desig "LEARNED_MODEL" "back" 
+                                         ?object-frame ?attractor-frame ""))
+    (lasa-pm-running?)
+    (desig:trajectory-desig? ?desig)
+    (current-designator ?desig ?current-desig)
+    (desig-prop ?current-desig (to retract))
+    (desig-prop ?current-desig (obj ?obj-desig))
+    (current-designator ?obj-desig ?current-obj-desig)
+    (some-stuff-desig? ?current-obj-desig)
+    (desig-prop ?current-obj-desig (object-frame ?object-frame))
+    (desig-prop ?current-obj-desig (back-attractor ?attractor-frame)))
 )
 
 (def-fact-group lasa-process-module (matching-process-module available-process-module)
@@ -91,7 +134,9 @@
   (<- (matching-process-module ?desig lasa-process-module)
     (desig::action-desig? ?desig)
     (or (desig-prop ?desig (to perceive))
-        (desig-prop ?desig (to roll))))
+        (desig-prop ?desig (to reach))
+        (desig-prop ?desig (to roll))
+        (desig-prop ?desig (to retract))))
 
   (<- (available-process-module lasa-process-module)
     (crs:true)))

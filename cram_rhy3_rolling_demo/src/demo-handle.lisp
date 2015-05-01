@@ -49,7 +49,10 @@
      :lasa-controllers lasa-controllers)))
 
 (defun call-lasa-perception (handle)
-  (call-persistent-service (dh-lasa-perception handle)))
+  (declare (ignore handle))
+  (call-service "/attractor_pose" "lasa_perception_module/attractorPose")
+  ;; (call-persistent-service (dh-lasa-perception handle))
+  )
 
 (defun call-lasa-controller (handle action-type action-name object-frame attractor-frame
                              force-gmm-id)
@@ -75,13 +78,10 @@
 ;;; PLANS
 ;;;
 
-(def-top-level-cram-function rolling-demo ()
-  (with-designators ((dough (object '((some stuff))))
-                     (rolling-action (action `((type trajectory)
-                                               (to roll)
-                                               (obj ,dough)))))
+(def-top-level-cram-function rolling-demo (max-iterations target-size)
+  (with-designators ((dough (object '((some stuff)))))
     (with-process-modules-running (lasa-process-module)
-      (cpl:with-retry-counters ((retry-count 10))
+      (cpl:with-retry-counters ((retry-count max-iterations))
         (cpl:with-failure-handling
             (((or cram-plan-failures:object-not-found
                   cram-plan-failures:manipulation-failure
@@ -89,12 +89,35 @@
                (declare (ignore f))
                (cpl:do-retry retry-count (cpl:retry))))
           (equate dough (plan-lib:perceive-object 'plan-lib:currently-visible dough))
-          (equate rolling-action (copy-designator rolling-action :new-description `((iteration ,(- 10 (cpl:get-counter retry-count))))))
-          (plan-lib:perform rolling-action)
+          (roll-object dough (- max-iterations (cpl-impl:get-counter retry-count)))
           (equate dough (plan-lib:perceive-object 'plan-lib:currently-visible dough))
-          (when (< (desig-prop-value (current-desig dough) 'size) 0.2)
+          (when (< (desig-prop-value (current-desig dough) 'size) target-size)
             (cpl:fail 'cram-plan-failures:manipulation-failure)))))))
+
+(def-cram-function roll-object (object iteration)
+  (with-designators ((reach-action (action `((type trajectory) 
+                                             (to reach)
+                                             (obj ,object)
+                                             (iteration ,iteration))))
+                     (roll-action (action `((type trajectory)
+                                            (to roll)
+                                            (obj ,object)
+                                            (iteration ,iteration))))
+                     (retract-action (action `((type trajectory) 
+                                               (to retract)
+                                               (obj ,object)
+                                               (iteration ,iteration)))))
+    (plan-lib:perform reach-action)
+    (plan-lib:perform roll-action)
+    (plan-lib:perform retract-action)))
+  
  
+;; (defun my-main ()
+;;   (beliefstate:enable-logging t)
+;;   (beliefstate:set-metadata ... )
+;;   (rolling-demo)
+;;   (beliefstate:extract-files))
+
 ;;;
 ;;; ORIGINAL SCRIPT
 ;;;
