@@ -63,27 +63,31 @@
     (let ((dh (get-demo-handle)))
       (initialize-demo-setup dh :boxy)
       (select-rs-instance "pizza_demo")
-      (wait-for-kqml-message
-       dh "PR2" "Boxy" "spoon on counter")
-      (grasp-spoon dh)
+      (wait-for-kqml-message dh "PR2" "Boxy" "spoon on counter")
+      (grasp-spoon)
+      (spread-tomato-sauce)
       ;; TODO(all): Perform actual Boxy demo plans here
 
       ;(human-tracking) ;; This happens after everything else and triggers tracking of the human. It automatically waits for the PR2 to report that the tray was shoven into the oven.
       (destroy-demo-handle dh))))
 
-(def-cram-function grasp-spoon (demo-handle)
-  (with-designators ((park-right-arm (action '((desig-props::type desig-props::trajectory)
+(def-cram-function grasp-spoon ()
+  (with-designators ((spoon (object '((desig-props::type desig-props::spoon))))
+                     (park-right-arm (action '((desig-props::type desig-props::trajectory)
                                                (desig-props::to desig-props::park)
                                                (desig-props::arm desig-props::right))))
                      (park-left-arm (action '((desig-props::type desig-props::trajectory)
                                                (desig-props::to desig-props::park)
-                                               (desig-props::arm desig-props::left)))))
-    (perform park-right-arm)
-    (perform park-left-arm)
-    (let ((spoon (dh-obj-spoon demo-handle)))
-      ;; lookat right-table
-      (perceive-object 'cram-plan-library:currently-visible spoon)
-      (achieve `(object-picked ,spoon))
+                                               (desig-props::arm desig-props::left))))
+   )
+ ;  (perform park-right-arm)
+ ;  (perform park-left-arm)
+    ;; lookat right-table
+    (equate spoon (first (perceive-object 'cram-plan-library:currently-visible spoon)))
+    (perform (make-designator 'action `((desig-props::type desig-props::trajectory) 
+                                        (desig-props::to desig-props::grasp) 
+                                        (desig-props::obj ,spoon))))
+;      (achieve `(object-picked ,spoon))
       ;; lookat center
       ;; perceive pizza tray
       ;; perceive tomate sauce
@@ -95,6 +99,22 @@
       ;; add ham
       ;;
       ;; call pr2
+      ))
+
+(def-cram-function spread-tomato-sauce ()
+  (with-designators ((tray (object '((desig-props::type desig-props::tray))))
+                     (tomato-bowl (object '((desig-props::type desig-props::red_bowl)))))
+    (equate tray (first (perceive-object 'cram-plan-library:currently-visible tray)))
+    (equate tomato-bowl (first (perceive-object 'cram-plan-library:currently-visible tomato-bowl)))
+    (with-designators ((add-tomato 
+                        (action `((desig-props::type desig-props::trajectory)
+                                  (desig-props::to desig-props::add)
+                                  (desig-props::stuff desig-props::tomato)
+                                  (desig-props::source ,tomato-bowl)
+                                  (desig-props::destination ,tray)))))
+      (perform add-tomato)
+      tomato-bowl
+      ;; to be continued...
       )))
 
 (def-cram-function fetch-tray (demo-handle)
