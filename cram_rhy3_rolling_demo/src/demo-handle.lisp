@@ -63,8 +63,15 @@
      :force_gmm_id force-gmm-id)
    0.0
    1.0))
+
+(defparameter *handle* nil)
+
+(defun get-handle ()
+  (unless *handle*
+    (setf *handle* (init-rolling-demo)))
+  *handle*)
     
-(defun main (handle)
+(defun main ()
   (let ((desired-area 0.2)
         (area 0.0)
         (perception-counter 0)
@@ -75,10 +82,10 @@
                        0.7551921010017395)))
     (format t "ensuring pos controllers: ~a~%"
             (boxy-pm:ensure-pos-controllers 
-             (boxy-pm:boxy-controller-manager (dh-boxy-pm handle)) :arms :right))
+             (boxy-pm:boxy-controller-manager (dh-boxy-pm (get-handle))) :arms :right))
     (format t "going into start config: ~a~%"
             (boxy-pm:move-arm-config 
-             (boxy-pm:boxy-right-arm (dh-boxy-pm handle))
+             (boxy-pm:boxy-right-arm (dh-boxy-pm (get-handle)))
              (boxy-pm:get-right-arm-joint-names)
              home-config 5.0))
     (loop while (and (< perception-counter max-perception-counter) 
@@ -89,7 +96,7 @@
                     (object-frame object_frame) (reach-center reach_center_attractor)
                     (reach-corner reach_corner_attractor) (roll-attractor roll_attractor)
                     (back-attractor back_attractor))
-          (call-lasa-perception handle)
+          (call-lasa-perception (get-handle))
         (when dough-p
           (setf area area-val)
           (format t "Found some dough~%")
@@ -109,9 +116,9 @@
                         reach-corner))))
             (format t "ensure-vel-controllers: ~a~%"
                     (boxy-pm:ensure-vel-controllers 
-                     (boxy-pm:boxy-controller-manager (dh-boxy-pm handle)) :arms :right))
+                     (boxy-pm:boxy-controller-manager (dh-boxy-pm (get-handle))) :arms :right))
             (format t "reach: ~a~%"
-                    (call-lasa-controller handle 
+                    (call-lasa-controller (get-handle)
                                   "LEARNED_MODEL"
                                   "reach"
                                   object-frame
@@ -119,7 +126,7 @@
                                   "")
                     )
             (format t "roll: ~a~%"
-                    (call-lasa-controller handle
+                    (call-lasa-controller (get-handle)
                                    "LEARNED_MODEL"
                                    "roll"
                                    object-frame
@@ -127,7 +134,7 @@
                                    force-gmm-id)
                     )
             (format t "back~%~a~%"
-                    (call-lasa-controller handle
+                    (call-lasa-controller (get-handle)
                                           "LEARNED_MODEL"
                                           "back"
                                           object-frame
