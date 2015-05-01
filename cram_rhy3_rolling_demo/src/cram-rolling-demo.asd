@@ -40,5 +40,6 @@
                cram-plan-failures)
   :components
   ((:file "package")
-   (:file "process-module" :depends-on ("package"))
-   (:file "demo-handle" :depends-on ("package"))))
+   (:file "demo-handle" :depends-on ("package"))
+   (:file "process-module" :depends-on ("package" "demo-handle"))
+   (:file "plans" :depends-on ("package" "process-module" "demo-handle"))))
