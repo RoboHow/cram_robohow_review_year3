@@ -225,22 +225,62 @@
     (cpl:sleep 3)))
 
 (def-action-handler add-stuff (side pre-config source-traj dest-traj)
+  (declare (ignore pre-config dest-traj))
   (ros-info (boxy-pm) "Adding stuff with ~a arm" side)
-  (loop for pose in source-traj do
-    (
+  (loop for pose-stamped in source-traj with counter = 1 do
+    (publish-pose-stamped 
+     pose-stamped (concatenate 'string "SOURCE_" (write-to-string counter)))
+    (incf counter))
 )
 
-(defun add-tomato-sauce-trajectory (source-pose dest-pose)
-  (declare (ignore dest-pose))
-  (let ((source-transform
-          (cl-transforms:pose->transform source-pose))
-        (source-offsets
+(defun transform-pose-stamped (stamped-transform pose-stamped)
+  (with-slots ((frame-id cl-tf-datatypes:frame-id)
+               (stamp cl-tf-datatypes:stamp)) stamped-transform
+    (with-slots ((orientation cl-tf-datatypes:orientation)
+                 (origin cl-tf-datatypes:origin))
+        (cl-transforms:transform-pose stamped-transform pose-stamped)
+    (cl-tf-datatypes:make-pose-stamped frame-id stamp origin orientation))))
+
+(defun pose-stamped->stamped-transform (pose-stamped child-frame-id)
+  (with-slots ((frame-id cl-tf-datatypes:frame-id)
+               (stamp cl-tf-datatypes:stamp)
+               (orientation cl-tf-datatypes:orientation)
+               (origin cl-tf-datatypes:origin)) pose-stamped
+    (cl-tf-datatypes:make-stamped-transform 
+     frame-id child-frame-id stamp origin orientation)))
+        
+(defun copy-stamped-transform (transform &key frame-id child-frame-id stamp
+                                           translation rotation)
+  (with-slots ((old-frame-id cl-tf-datatypes:frame-id)
+               (old-child-frame-id cl-tf-datatypes:child-frame-id)
+               (old-stamp cl-tf-datatypes:stamp)
+               (old-translation cl-tf-datatypes:translation)
+               (old-rotation cl-tf-datatypes:rotation)) transform
+    (cl-tf-datatypes:make-stamped-transform 
+     (or frame-id old-frame-id)
+     (or child-frame-id old-child-frame-id)
+     (or stamp old-stamp)
+     (or translation old-translation)
+     (or rotation old-rotation))))
+
+(defun add-tomato-sauce-trajectory (source-transform dest-transform)
+  (declare (ignore dest-transform))
+  (let ((source-poses
           (list
-           (cl-transforms:make-pose
+           (cl-tf-datatypes:make-pose-stamped
+            "RED_BOWL" 0.0
             (cl-transforms:make-3d-vector -0.11 -0.076 0.028)
             (cl-transforms:make-quaternion -0.664584 -0.552654 -0.27083 -0.42373)))))
     (list
-     (mapcar (alexandria:curry #'cl-transforms:transform-pose source-transform) source-offsets)
+     (mapcar 
+      (lambda (source-pose)
+        (cl-tf-datatypes:copy-pose-stamped
+         (cl-tf:transform-pose 
+          cram-roslisp-common:*tf* 
+          :pose (transform-pose-stamped source-transform source-pose)
+          :target-frame "base_link")
+         :orientation (cl-transforms:make-identity-rotation)))
+      source-poses)
      nil)
 ))
 
@@ -250,13 +290,16 @@
 
 (def-fact-group boxy-pm-action-designators (action-desig)
 
-  (<- (object-desig-pose ?desig ?pose)
+  (<- (object-desig-transform ?desig ?transform)
     (desig::obj-desig? ?desig)
     (current-designator ?desig ?current-obj)
     (desig-prop ?current-obj (at ?obj-loc))
+    (desig-prop ?current-obj (type ?obj-type))
+    (lisp-fun string ?obj-type ?obj-name)
     (desig::loc-desig? ?obj-loc)
     (current-designator ?obj-loc ?current-obj-loc)
-    (desig-prop ?current-obj-loc (pose ?pose)))
+    (desig-prop ?current-obj-loc (pose ?pose))
+    (lisp-fun pose-stamped->stamped-transform ?pose ?obj-name ?transform))
 
   (<- (boxy-pm-running?)
     (desig::lisp-pred cram-process-modules::get-running-process-module
@@ -311,10 +354,10 @@
     (desig-prop ?desig (stuff tomato))
     (desig-prop ?desig (source ?source-obj))
     (desig-prop ?desig (destination ?dest-obj))
-    (object-desig-pose ?dest-obj ?dest-pose)
-    (object-desig-pose ?source-obj ?source-pose)
+    (object-desig-transform ?dest-obj ?dest-transform)
+    (object-desig-transform ?source-obj ?source-transform)
     (equal ?pre-config (-1.97 0.8 -1.29 -1.05 0.52 1.29 -0.93))
-    (lisp-fun add-tomato-sauce-trajectory ?source-pose ?dest-pose (?source-traj ?dest-traj))
+    (lisp-fun add-tomato-sauce-trajectory ?source-transform ?dest-transform (?source-traj ?dest-traj))
 )
 )
 
