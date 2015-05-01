@@ -43,7 +43,8 @@
   (right-arm-vel-mux nil)
   (left-gripper nil)
   (right-gripper nil)
-  (ptu nil))
+  (ptu nil)
+  (tf-broadcaster nil))
   
 (defun init-boxy-pm-handle ()
   (let ((controller-manager
@@ -69,6 +70,7 @@
                         "/l_arm_cart_controller"))
         (right-arm-cart (init-cartesian-controller-handle
                         "/r_arm_cart_controller"))
+        (tf-broadcaster (cl-tf2:make-transform-broadcaster))
 )
     (make-boxy-pm-handle :controller-manager controller-manager
                          :right-arm right-arm-joint-controller
@@ -80,6 +82,7 @@
                          :ptu ptu
                          :left-arm-cart left-arm-cart
                          :right-arm-cart right-arm-cart
+                         :tf-broadcaster tf-broadcaster
                          )
 ))
 
@@ -154,12 +157,11 @@
     (switch-mux mux (cart-out-topic controller))
     (ensure-vel-controllers (boxy-controller-manager handle))
     (cpl-impl:pursue
-      (cpl-impl:seq 
-        (cpl:sleep timeout)
-        (cpl:fail 'cram-plan-failures:manipulation-pose-unreachable))
+      (cpl:sleep timeout)
       (cpl-impl:wait-for (cpl-impl:fl-funcall #'cart-controller-finished-p state-fluent))
       (cpl-impl:whenever ((cpl:pulsed state-fluent))
-        (move-cart controller goal-pose ee-frame)))))
+        (move-cart controller goal-pose ee-frame)))
+    (stop-cartesian-controller controller)))
 
 (def-action-handler look-at (pose &optional (timeout 5.0))
   (ros-info (boxy-pm) "Looking at pose ~a" pose)
@@ -169,17 +171,78 @@
            :mode 0 :pose (cl-tf:pose-stamped->msg pose))
      timeout 1.0)))  
 
-(def-action-handler grasp-object (side pre-config)
-  (format t "in grasping function~%")
+(defun publish-pose-stamped (pose-stamped child-frame-id)
+  (with-slots ((frame-id cl-tf-datatypes:frame-id)
+               (stamp cl-tf-datatypes:stamp)
+               (orientation cl-tf-datatypes:orientation)
+               (origin cl-tf-datatypes:origin)) pose-stamped
+    (cl-tf2:send-transform
+     (boxy-tf-broadcaster (get-boxy-pm-handle))
+     (cl-tf2:make-stamped-transform
+      frame-id
+      child-frame-id
+      (ros-time)
+      (cl-transforms:make-transform
+       origin orientation)))))
+
+(def-action-handler grasp-object (side pre-config object-pose)
   (let* ((handle (get-boxy-pm-handle))
          (gripper (ecase side
                    (:left (boxy-left-gripper handle))
-                   (:right (boxy-right-gripper handle)))))
+                   (:right (boxy-right-gripper handle))))
+         (object-pose-in-base-link
+           (cl-tf:transform-pose 
+            cram-roslisp-common:*tf* 
+            :pose (cl-tf-datatypes:copy-pose-stamped object-pose :stamp 0.0)
+            :target-frame "base_link"))
+         (goal-pose
+           (cl-tf-datatypes:copy-pose-stamped
+            object-pose-in-base-link
+            ;; slightly alter position
+            :origin 
+            (cl-transforms:v+
+             (cl-tf-datatypes:origin object-pose-in-base-link)
+             (cl-transforms:make-3d-vector -0.025 0.0 0.0))
+             ;; replace orientation with fixed one from Alexis
+            :orientation (cl-transforms:make-quaternion 0.598 -0.588 0.387 -0.383)
+            :stamp 0.0))
+         (pre-pose
+           (cl-tf-datatypes:copy-pose-stamped
+            goal-pose
+            :origin
+            (cl-transforms:v+
+             (cl-tf-datatypes:origin goal-pose)
+             (cl-transforms:make-3d-vector 0.0 0.0 0.2)))))
     (cram-wsg50:move-wsg50 gripper 110 60 20)
-    (cpl::sleep 1)
     (arm-joint-move side pre-config)
+    (publish-pose-stamped object-pose "spoon")
+    (publish-pose-stamped pre-pose "spoon-pre-goal")
+    (publish-pose-stamped goal-pose "spoon-goal")
+    (arm-cart-move side pre-pose "right_gripper_tool_frame" 12.0)
+    (cpl-impl:sleep* 0.5)
+    (arm-cart-move side goal-pose "right_gripper_tool_frame" 12.0)
     (cram-wsg50:move-wsg50 gripper 5 60 20)
     (cpl:sleep 3)))
+
+(def-action-handler add-stuff (side pre-config source-traj dest-traj)
+  (ros-info (boxy-pm) "Adding stuff with ~a arm" side)
+  (loop for pose in source-traj do
+    (
+)
+
+(defun add-tomato-sauce-trajectory (source-pose dest-pose)
+  (declare (ignore dest-pose))
+  (let ((source-transform
+          (cl-transforms:pose->transform source-pose))
+        (source-offsets
+          (list
+           (cl-transforms:make-pose
+            (cl-transforms:make-3d-vector -0.11 -0.076 0.028)
+            (cl-transforms:make-quaternion -0.664584 -0.552654 -0.27083 -0.42373)))))
+    (list
+     (mapcar (alexandria:curry #'cl-transforms:transform-pose source-transform) source-offsets)
+     nil)
+))
 
 ;;;
 ;;; PROLOG FACTS
@@ -187,7 +250,20 @@
 
 (def-fact-group boxy-pm-action-designators (action-desig)
 
+  (<- (object-desig-pose ?desig ?pose)
+    (desig::obj-desig? ?desig)
+    (current-designator ?desig ?current-obj)
+    (desig-prop ?current-obj (at ?obj-loc))
+    (desig::loc-desig? ?obj-loc)
+    (current-designator ?obj-loc ?current-obj-loc)
+    (desig-prop ?current-obj-loc (pose ?pose)))
+
+  (<- (boxy-pm-running?)
+    (desig::lisp-pred cram-process-modules::get-running-process-module
+                      boxy-process-module))
+
   (<- (action-desig ?designator (arm-joint-move :right ?config)) 
+    (boxy-pm-running?)
     (desig::action-desig? ?designator)
     (desig-prop ?designator (type trajectory))
     (desig-prop ?designator (to park))
@@ -195,6 +271,7 @@
     (equal ?config (-1.25 -1.23 -0.29 -2.1 0.4 0.58 0.13)))
 
   (<- (action-desig ?designator (arm-joint-move :left ?config)) 
+    (boxy-pm-running?)
     (desig::action-desig? ?designator)
     (desig-prop ?designator (type trajectory))
     (desig-prop ?designator (to park))
@@ -202,49 +279,49 @@
     (equal ?config (-2.13 -0.93 0.45 -1.89 -0.15 0.1 1.3)))
 
   (<- (action-desig ?designator (look-at ?pose))
+    (boxy-pm-running?)
     (desig::action-desig? ?designator)
     (desig-prop ?designator (type trajectory))
     (desig-prop ?designator (to follow))
     (desig-prop ?designator (pose ?pose)))
       
-  (<- (action-desig ?designator (grasp-object ?side ?pre-config))
+  (<- (action-desig ?designator (grasp-object ?side ?pre-config ?obj-pose))
+    (boxy-pm-running?)
     (desig::action-desig? ?designator)
     (desig-prop ?designator (type trajectory))
     (desig-prop ?designator (to grasp))
     (format "in grasping pattern~%")
     (desig-prop ?designator (obj ?obj))
-    (format "a")
     (current-designator ?obj ?current-obj)
-    (format "b")
+    (format "~a~%" ?current-obj)
     (obj-desig? ?current-obj)
-    (format "c")
     (desig-prop ?current-obj (type spoon))
-    (format "d")
+    (desig-prop ?current-obj (at ?obj-loc))
+    (current-designator ?obj-loc ?current-obj-loc)
+    (desig-prop ?current-obj-loc (pose ?obj-pose))
     (equal ?side :right)
-    (format "e")
     (equal ?pre-config (-1.47 0.98 -1.2 -1.9 0.26 0.0 1.1))
-    (format "f"))
+
+)
+
+  (<- (action-desig ?desig (add-stuff :right ?pre-config ?source-traj ?dest-traj))
+    (boxy-pm-running?)
+    (desig::trajectory-desig? ?desig)
+    (desig-prop ?desig (to add))
+    (desig-prop ?desig (stuff tomato))
+    (desig-prop ?desig (source ?source-obj))
+    (desig-prop ?desig (destination ?dest-obj))
+    (object-desig-pose ?dest-obj ?dest-pose)
+    (object-desig-pose ?source-obj ?source-pose)
+    (equal ?pre-config (-1.97 0.8 -1.29 -1.05 0.52 1.29 -0.93))
+    (lisp-fun add-tomato-sauce-trajectory ?source-pose ?dest-pose (?source-traj ?dest-traj))
+)
 )
 
 (def-fact-group boxy-process-module (matching-process-module available-process-module)
 
-  (<- (matching-process-module ?designator boxy-process-module)
-    (desig::action-desig? ?designator)
-    (or 
-     (and 
-      (desig-prop ?designator (type trajectory))
-      (desig-prop ?designator (to park))
-      (desig-prop ?designator (arm ?_)))
-     (and
-      (desig-prop ?designator (type trajectory))
-      (desig-prop ?designator (to follow))
-      (desig-prop ?designator (pose ?pose)))
-     (and
-      (desig-prop ?designator (type trajectory))
-      (desig-prop ?designator (to grasp))
-      (desig-prop ?designator (obj ?_)))
-
-))
+  (<- (matching-process-module ?desig boxy-process-module)
+    (desig::trajectory-desig? ?desig))
                            
   (<- (available-process-module boxy-process-module)
     (crs:true)))

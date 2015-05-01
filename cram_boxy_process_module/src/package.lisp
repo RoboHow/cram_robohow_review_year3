@@ -33,10 +33,11 @@
         #:roslisp
         #:cram-process-modules
         #:desig)
-  (:import-from #:cram-reasoning #:<- #:def-fact-group)
+  (:import-from #:cram-reasoning #:<- #:def-fact-group #:lisp-fun)
   (:export boxy-process-module init-boxy-pm-handle cleanup-boxy-pm-handle
            boxy-pm-handle boxy-controller-manager boxy-right-arm
            stop-controllers ensure-vel-controllers ensure-pos-controllers
            move-arm-config get-right-arm-joint-names get-left-arm-joint-names)
   (:desig-properties :to :follow :pose :grasp :type :trajectory :obj :spoon
-                     :park :arm :side :right :left))
+                     :park :arm :side :right :left :at :add :stuff :tomato
+                     :source :destination))
