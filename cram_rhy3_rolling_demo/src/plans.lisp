@@ -28,20 +28,23 @@
 (in-package :cram-rolling-demo)
 
 (def-top-level-cram-function rolling-demo (max-iterations target-size)
-  (with-designators ((dough (object '((some stuff)))))
-    (with-process-modules-running (lasa-process-module)
-      (cpl:with-retry-counters ((retry-count max-iterations))
-        (cpl:with-failure-handling
-            (((or cram-plan-failures:object-not-found
-                  cram-plan-failures:manipulation-failure
-                  cram-plan-failures:location-not-reached-failure) (f)
-               (declare (ignore f))
-               (cpl:do-retry retry-count (cpl:retry))))
-          (equate dough (plan-lib:perceive-object 'plan-lib:currently-visible dough))
-          (roll-object dough (- max-iterations (cpl-impl:get-counter retry-count)))
-          (equate dough (plan-lib:perceive-object 'plan-lib:currently-visible dough))
-          (when (< (desig-prop-value (current-desig dough) 'size) target-size)
-            (cpl:fail 'cram-plan-failures:manipulation-failure)))))))
+  (cpl-impl:with-failure-handling (((or cram-plan-failures:manipulation-failure) (e)
+                                     (declare (ignore e))
+                                     (return)))
+    (with-designators ((dough (object '((some stuff)))))
+      (with-process-modules-running (lasa-process-module)
+        (cpl:with-retry-counters ((retry-count max-iterations))
+          (cpl:with-failure-handling
+              (((or cram-plan-failures:object-not-found
+                    cram-plan-failures:manipulation-failure
+                    cram-plan-failures:location-not-reached-failure) (f)
+                 (declare (ignore f))
+                 (cpl:do-retry retry-count (cpl:retry))))
+            (equate dough (plan-lib:perceive-object 'plan-lib:currently-visible dough))
+            (roll-object dough (- max-iterations (cpl-impl:get-counter retry-count)))
+            (equate dough (plan-lib:perceive-object 'plan-lib:currently-visible dough))
+            (when (< (desig-prop-value (current-desig dough) 'size) target-size)
+              (cpl:fail 'cram-plan-failures:manipulation-failure))))))))
 
 (def-cram-function roll-object (object iteration)
   (with-designators 
@@ -55,6 +58,11 @@
     (plan-lib:perform roll-action)
     (plan-lib:perform retract-action)))
 
+;;;
+;;; NICE STARTING CONFIGURATION FOR RIGHT ARM
+;;; 0.251941055059433, -0.4262639880180359, 0.7331973910331726, 1.228747010231018, 1.926756739616394, 1.4463988542556763, 0.31512778997421265
+;;;
+
 (defun main ()
   "Call this function from a bash-script to run the demo."
   (roslisp-utilities:startup-ros)
@@ -64,12 +72,12 @@
    :creator"IAI, UniHB and LASA, EPFL"
    :experiment "Dough rolling experiment with LASA controllers for RoboHow Year3 review."
    :description "One armed dough rolling with learned GMM controllers, triggered by CRAM.")
-  (rolling-demo)
+  (rolling-demo 10 0.06)
   (beliefstate:extract-files)
   (roslisp-utilities:shutdown-ros))
 
 ;;;
-;;; ORIGINAL SCRIPT
+;;; ORIGINAL LISP SCRIPT
 ;;;
 
 ;; (defun main ()
