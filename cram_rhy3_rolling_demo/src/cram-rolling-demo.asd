@@ -37,7 +37,8 @@
                lasa_action_planners-msg
                cram-language-designator-support
                cram-plan-library
-               cram-plan-failures)
+               cram-plan-failures
+               cram-beliefstate)
   :components
   ((:file "package")
    (:file "demo-handle" :depends-on ("package"))

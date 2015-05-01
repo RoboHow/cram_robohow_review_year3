@@ -55,12 +55,18 @@
     (plan-lib:perform roll-action)
     (plan-lib:perform retract-action)))
 
-
-;; (defun my-main ()
-;;   (beliefstate:enable-logging t)
-;;   (beliefstate:set-metadata ... )
-;;   (rolling-demo)
-;;   (beliefstate:extract-files))
+(defun main ()
+  "Call this function from a bash-script to run the demo."
+  (roslisp-utilities:startup-ros)
+  (beliefstate:enable-logging t)
+  (beliefstate:set-metadata 
+   :robot "BOXY" 
+   :creator"IAI, UniHB and LASA, EPFL"
+   :experiment "Dough rolling experiment with LASA controllers for RoboHow Year3 review."
+   :description "One armed dough rolling with learned GMM controllers, triggered by CRAM.")
+  (rolling-demo)
+  (beliefstate:extract-files)
+  (roslisp-utilities:shutdown-ros))
 
 ;;;
 ;;; ORIGINAL SCRIPT
