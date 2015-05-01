@@ -32,4 +32,6 @@
   (:import-from #:cram-reasoning #:<- #:def-fact-group)
   (:import-from #:cram-language def-cram-function def-top-level-cram-function top-level)
   (:import-from :cram-language-designator-support with-designators)
-  (:desig-properties #:to #:perceive #:obj #:roll #:some #:stuff #:type #:trajectory))
+  (:desig-properties #:to #:perceive #:obj #:roll #:some #:stuff #:type #:trajectory
+                     #:size #:object-frame #:reach-center #:reach-corner
+                     #:roll-attractor #:back-attractor))

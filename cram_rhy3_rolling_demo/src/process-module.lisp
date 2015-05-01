@@ -39,9 +39,18 @@
 
 (def-action-handler lasa-perceive (object-designator)
   (ros-info (lasa-pm) "Perceiving dough with LASA perception")
-  ; IMPLEMENT ME
-)
-
+  (with-fields ((area-val area) (dough-p dough_found)
+                (object-frame object_frame) (reach-center reach_center_attractor)
+                (reach-corner reach_corner_attractor) (roll-attractor roll_attractor)
+                (back-attractor back_attractor))
+      (call-lasa-perception (get-handle))
+    (if dough-p
+        (copy-designator object-designator
+                         :new-description `((size ,area-val) (object-frame ,object-frame) 
+                                            (reach-center ,reach-center) (reacher-corner ,reach-corner) 
+                                            (roll-attractor ,roll-attractor) (back-attractor ,back-attractor)))
+        (cpl:fail 'cram-plan-failures:object-not-found))))
+                                       
 (def-action-handler lasa-roll (object-designator)
   (ros-info (lasa-pm) "Rolling dough with LASA controllers")
   ; IMPLEMENT ME

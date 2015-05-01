@@ -82,7 +82,7 @@
                                                (obj ,dough)))))
     ; (loop while ...
     (with-process-modules-running (lasa-process-module)
-      (plan-lib:perceive-object 'plan-lib:currently-visible dough)
+      (equate dough (plan-lib:perceive-object 'plan-lib:currently-visible dough))
       (plan-lib:perform rolling-action))))
     
 
