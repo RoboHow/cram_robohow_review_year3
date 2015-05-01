@@ -101,6 +101,7 @@
      :key (lambda (desig) (desig-prop-value desig 'desig-props:type)))))
 
 (defun call-perception-function (object-designator)
+  (uima::trigger object-designator)
   (let ((results
           (uima:get-uima-result
            (make-designator
@@ -108,7 +109,8 @@
     (unless results
       (cpl:fail 'cram-plan-failures:object-not-found
                 :object-desig object-designator))
-    (filter-results-on-type object-designator (post-process-results results))))
+    (let ((unfiltered-results (post-process-results results)))
+      (filter-results-on-type object-designator unfiltered-results))))
 
 (def-action-handler perceive (object-designator)
   (ros-info (perception) "Perceiving object with mini-pm.")
@@ -118,8 +120,12 @@
   (apply #'call-action (reference desig)))
 
 (def-fact-group robosherlock-mini-action-designators (action-desig)
+  (<- (robosherlock-mini-pm-running?)
+    (desig::lisp-pred cram-process-modules::get-running-process-module
+                      robosherlock-mini-process-module))
 
   (<- (action-desig ?designator (perceive ?object-desig))
+    (robosherlock-mini-pm-running?)
     (desig-prop ?designator (to perceive))
     (desig-prop ?designator (obj ?object-desig))
     (current-designator ?object-desig ?current-object-desig)
