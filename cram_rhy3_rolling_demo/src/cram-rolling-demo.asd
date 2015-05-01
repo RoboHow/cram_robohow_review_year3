@@ -38,7 +38,8 @@
                cram-language-designator-support
                cram-plan-library
                cram-plan-failures
-               cram-beliefstate)
+               cram-beliefstate
+               robosherlock_mini_process_module)
   :components
   ((:file "package")
    (:file "demo-handle" :depends-on ("package"))

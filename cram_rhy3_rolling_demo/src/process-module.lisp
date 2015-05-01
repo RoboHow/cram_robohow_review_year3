@@ -44,7 +44,6 @@
                 (reach-corner reach_corner_attractor) (roll-attractor roll_attractor)
                 (back-attractor back_attractor))
       (call-lasa-perception (get-handle))
-    (format t "hu~%")
     (if dough-p
         (copy-designator object-designator
                          :new-description 

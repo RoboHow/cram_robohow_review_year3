@@ -43,6 +43,8 @@
            "plan2ctrl"
            "lasa_action_planners/PLAN2CTRLAction")))
     (actionlib-lisp:wait-for-server lasa-controllers 2.0)
+    (uima::set-uima-host "/RoboSherlock_dough_detection")
+    (uima::init-uima-bridge)
     (make-rolling-demo-handle
      :boxy-pm boxy-pm
      :lasa-perception lasa-perception
