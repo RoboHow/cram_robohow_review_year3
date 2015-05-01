@@ -80,12 +80,21 @@
                      (rolling-action (action `((type trajectory)
                                                (to roll)
                                                (obj ,dough)))))
-    ; (loop while ...
     (with-process-modules-running (lasa-process-module)
-      (equate dough (plan-lib:perceive-object 'plan-lib:currently-visible dough))
-      (plan-lib:perform rolling-action))))
-    
-
+      (cpl:with-retry-counters ((retry-count 10))
+        (cpl:with-failure-handling
+            (((or cram-plan-failures:object-not-found
+                  cram-plan-failures:manipulation-failure
+                  cram-plan-failures:location-not-reached-failure) (f)
+               (declare (ignore f))
+               (cpl:do-retry retry-count (cpl:retry))))
+          (equate dough (plan-lib:perceive-object 'plan-lib:currently-visible dough))
+          (equate rolling-action (copy-designator rolling-action :new-description `((iteration ,(- 10 (cpl:get-counter retry-count))))))
+          (plan-lib:perform rolling-action)
+          (equate dough (plan-lib:perceive-object 'plan-lib:currently-visible dough))
+          (when (< (desig-prop-value (current-desig dough) 'size) 0.2)
+            (cpl:fail 'cram-plan-failures:manipulation-failure)))))))
+ 
 ;;;
 ;;; ORIGINAL SCRIPT
 ;;;

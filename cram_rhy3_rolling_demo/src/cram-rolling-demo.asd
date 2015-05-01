@@ -36,7 +36,8 @@
                lasa_perception_module-srv
                lasa_action_planners-msg
                cram-language-designator-support
-               cram-plan-library)
+               cram-plan-library
+               cram-plan-failures)
   :components
   ((:file "package")
    (:file "process-module" :depends-on ("package"))

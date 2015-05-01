@@ -44,11 +44,13 @@
                 (reach-corner reach_corner_attractor) (roll-attractor roll_attractor)
                 (back-attractor back_attractor))
       (call-lasa-perception (get-handle))
+    ;; TODO: values: msg->LISP
     (if dough-p
         (copy-designator object-designator
-                         :new-description `((size ,area-val) (object-frame ,object-frame) 
-                                            (reach-center ,reach-center) (reacher-corner ,reach-corner) 
-                                            (roll-attractor ,roll-attractor) (back-attractor ,back-attractor)))
+                         :new-description 
+                         `((size ,area-val) (object-frame ,object-frame) 
+                           (reach-center ,reach-center) (reacher-corner ,reach-corner) 
+                           (roll-attractor ,roll-attractor) (back-attractor ,back-attractor)))
         (cpl:fail 'cram-plan-failures:object-not-found))))
                                        
 (def-action-handler lasa-roll (object-designator)
@@ -74,9 +76,13 @@
 
   (<- (action-desig ?desig (lasa-roll ?current-obj-desig))
     (lasa-pm-running?)
-    (desig-prop ?desig (to roll))
-    (desig-prop ?desig (obj ?obj-desig))
-    (some-stuff-desig? ?obj-desig))
+    ; trajectory-desig?
+    (current-designator ?desig ?current-designator)
+    (desig-prop ?current-desig (to roll))
+    (desig-prop ?current-desig (obj ?obj-desig))
+    (some-stuff-desig? ?obj-desig)
+    ; her reasoning
+)
 
 )
 
