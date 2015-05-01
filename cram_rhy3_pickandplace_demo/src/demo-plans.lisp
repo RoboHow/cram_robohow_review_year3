@@ -52,7 +52,7 @@
       ;(fetch-tomato-sauce dh)
       (fetch-tray dh)
       (tray-into-oven dh)
-      (close-oven dh)
+      ;(close-oven dh)
       ;;(shove-tray-into-oven dh)
       ;;(close-oven dh)
       ;;(send-kqml dh "PR2" "Boxy" "tray placed in oven")
@@ -118,6 +118,7 @@
       )))
 
 (def-cram-function fetch-tray (demo-handle)
+  (ensure-arms-up)
   (in-front-of
       (desig:make-designator
        'location

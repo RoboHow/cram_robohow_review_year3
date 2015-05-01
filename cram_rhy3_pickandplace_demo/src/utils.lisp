@@ -950,7 +950,7 @@ throughout the demo experiment."
                          ((cram-plan-library::object-not-found (f)
                             (declare (ignore f))
                             (cpl:retry)))
-                       ,@body)
+                       (progn ,@body))
          while (not result)
          finally (return result)))
 
@@ -1196,7 +1196,7 @@ throughout the demo experiment."
                        (perform action)))))
           (ensure-manipulation
             (move-handle-relative-pose
-             :right (cl-transforms:make-3d-vector -0.4 -0.2 0.02) nil))
+             :right (cl-transforms:make-3d-vector -0.4 -0.2 0.02) t))
           (pr2-manip-pm::open-gripper :right)
           (ensure-manipulation
             (move-arm-relative-pose
@@ -1213,8 +1213,12 @@ throughout the demo experiment."
             ;; Grasp object here.
             (look-into-drawer)
             (let ((spoon (ensure-results (perceive-spoon demo-handle))))
-              (ensure-manipulation
-                (pick-object spoon :stationary t :side :left))
+              (unwind-protect
+                   (progn
+                     (setf pr2-manip-pm::*allowed-arms* `(:left))
+                     (ensure-manipulation
+                       (pick-object spoon :stationary t :side :left)))
+                (setf pr2-manip-pm::*allowed-arms* `(:left :right)))
               (ensure-manipulation
                 (move-arm-relative-pose
                  :right (cl-transforms:make-3d-vector 0.4 0.0 0.0) t))
@@ -1231,7 +1235,7 @@ throughout the demo experiment."
   (let ((spoon-putdown-pose
           (tf:make-pose-stamped
            "map" 0.0
-           (tf:make-3d-vector -1.0 1.0 0.85)
+           (tf:make-3d-vector -1.0 0.93 0.85)
            (tf:euler->quaternion
             :ax pi :az pi))))
     (go-in-front-of-island-2)
@@ -1304,7 +1308,7 @@ throughout the demo experiment."
             :origin (tf:make-3d-vector
                      (tf:x (tf:origin target-pose))
                      (tf:y (tf:origin target-pose))
-                     (+ (tf:z (tf:origin source-pose)) 0.1)))))
+                     (+ (tf:z (tf:origin source-pose)) 0.0)))))
     (pr2-manip-pm::execute-move-arm-pose
      target-arm new-target-pose
      :ignore-collisions t
@@ -1366,7 +1370,7 @@ throughout the demo experiment."
      :ignore-collisions t)))
 
 (defun tray-into-oven (demo-handle)
-  (lift-arms-to 1.35)
+  (lift-arms-to 1.3)
   (align-arm-heights :left)
   (in-front-of-oven demo-handle)
   (in-front-of (make-designator
@@ -1376,20 +1380,31 @@ throughout the demo experiment."
                      "map" 0.0
                      (tf:make-3d-vector 0.513 1.881 0.0)
                      (tf:make-quaternion 0 0 0 1)))))
-      nil)
-  (lift-arms-to 1.30)
-  (pr2-manip-pm::open-gripper :right)
-  (pr2-single-arm-linear-relative-movement
-   :right (tf:make-3d-vector -0.4 0.0 0.0))
-  (pr2-single-arm-linear-relative-movement
-   :right (tf:make-3d-vector 0.0 0.25 0.0))
-  (pr2-single-arm-linear-relative-movement
-   :right (tf:make-3d-vector 0.02 0.0 0.0))
+      t)
+  (pr2-dual-arm-linear-relative-movement
+   (tf:make-3d-vector 0.0 0.0 -0.15))
   (pr2-manip-pm::open-gripper :left)
   (pr2-single-arm-linear-relative-movement
-   :right (tf:make-3d-vector 0.1 0.0 0.05))
+   :left (tf:make-3d-vector 0.0 0.1 0.0))
+  (pr2-manip-pm::open-gripper :right)
   (pr2-single-arm-linear-relative-movement
-   :left (tf:make-3d-vector -0.1 0.0 0.05)))
+   :left (tf:make-3d-vector 0.0 -0.1 0.0))
+  (ensure-arms-up))
+
+  ;; (pr2-dual-arm-linear-relative-movement
+  ;;  (tf:make-3d-vector 0.10 0.0 0.0))
+  ;; (pr2-manip-pm::open-gripper :right)
+  ;; (pr2-single-arm-linear-relative-movement
+  ;;  :right (tf:make-3d-vector -0.4 0.0 0.0))
+  ;; (pr2-single-arm-linear-relative-movement
+  ;;  :right (tf:make-3d-vector 0.0 0.25 0.0))
+  ;; (pr2-single-arm-linear-relative-movement
+  ;;  :right (tf:make-3d-vector 0.02 0.0 0.0))
+  ;; (pr2-manip-pm::open-gripper :left)
+  ;; (pr2-single-arm-linear-relative-movement
+  ;;  :right (tf:make-3d-vector 0.1 0.0 0.05))
+  ;; (pr2-single-arm-linear-relative-movement
+  ;;  :left (tf:make-3d-vector -0.1 0.0 0.05)))
 
 (defun close-oven (demo-handle)
   (in-front-of-oven demo-handle)
