@@ -30,7 +30,8 @@
 (defstruct (mux-handle (:conc-name mux-))
   (add nil)
   (select nil)
-  (list nil))
+  (list nil)
+  (namespace nil))
 
 (defun init-mux-handle (namespace)
   "Creates a new mux-handle which offers its services in `namespace'."
@@ -49,23 +50,33 @@
            'persistent-service
            :service-name (concatenate 'string namespace "/list")
            :service-type "topic_tools/MuxList")))
-    (make-mux-handle :add mux-add :select mux-select :list mux-list)))
+    (make-mux-handle :add mux-add :select mux-select :list mux-list
+                     :namespace namespace)))
         
 (defun mux-has-topic-p (handle in-topic)
   "Predicate to check whether the mux behind `handle' already subscribes
  to `in-topic'."
-  (with-fields (topics) (call-persistent-service (mux-list handle))
+  (with-fields (topics) 
+      (call-service 
+       (concatenate 'string (mux-namespace handle) "/list") 
+       "topic_tools/MuxList")
     (find in-topic (coerce topics 'list) :test #' string=)))
 
 (defun ensure-mux-has-topic (handle in-topic)
   "Ensures that the mux behind `handle' subscribes to `in-topic'."
   (unless (mux-has-topic-p handle in-topic)
-    (call-persistent-service (mux-add handle) :topic in-topic)))
+    (call-service 
+     (concatenate 'string (mux-namespace handle) "/add") 
+     "topic_tools/MuxAdd" :topic in-topic)))
 
 (defun switch-mux (handle in-topic)
   "Switches the input topic of the mux behind `handle' to `in-topic'."
   (ensure-mux-has-topic handle in-topic)
-  (call-persistent-service (mux-select handle) :topic in-topic))
+  (call-service 
+   (concatenate 'string (mux-namespace handle) "/select") 
+   "topic_tools/MuxSelect" :topic in-topic))
 
 (defun disable-mux (handle)
-  (call-persistent-service (mux-select handle) :topic "__none"))
+  (call-service 
+   (concatenate 'string (mux-namespace handle) "/select") 
+   "topic_tools/MuxSelect" :topic "__none"))
