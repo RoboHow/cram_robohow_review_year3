@@ -47,11 +47,10 @@
   (tf-broadcaster nil))
   
 (defun init-boxy-pm-handle ()
-  (let ((controller-manager
-          (make-instance
-           'persistent-service
-           :service-name "/controller_manager/switch_controller"
-           :service-type "controller_manager_msgs/SwitchController"))
+  (let ((controller-manager 
+          (make-service-client
+           "/controller_manager/switch_controller" 
+           "controller_manager_msgs/SwitchController"))
         (right-arm-joint-controller
           (actionlib-lisp:make-simple-action-client
            "/r_arm_traj_controller/follow_joint_trajectory"

@@ -27,15 +27,25 @@
 
 (in-package :boxy-pm)
 
-(defun switch-controllers (cm start stop)
-  (with-fields (ok)
-      (call-persistent-service 
-       cm
-       :start_controllers (map 'vector #'identity start)
-       :stop_controllers (map 'vector #'identity stop)
-       :strictness 1)
-    (unless ok
-      (error "Switching controllers failed. Start: ~a, stop: ~a." start stop))))
+(defgeneric switch-controllers (cm start stop)
+  (:method ((cm roslisp::persistent-service) start stop)
+    (with-fields (ok)
+        (call-persistent-service 
+         cm
+         :start_controllers (map 'vector #'identity start)
+         :stop_controllers (map 'vector #'identity stop)
+         :strictness 1)
+      (unless ok
+        (error "Switching controllers failed. Start: ~a, stop: ~a." start stop))))
+  (:method ((cm roslisp::service-client) start stop)
+    (with-fields (ok)
+        (call-service
+         cm
+         :start_controllers (map 'vector #'identity start)
+         :stop_controllers (map 'vector #'identity stop)
+         :strictness 1)
+        (unless ok
+          (error "Switching controllers failed. Start: ~a, stop: ~a." start stop)))))
 
 (defgeneric get-pos-controller-names (name)
   (:method ((name (eql :right)))
