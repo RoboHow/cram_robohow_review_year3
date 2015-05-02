@@ -39,7 +39,7 @@
                cram-plan-library
                cram-plan-failures
                cram-beliefstate
-               robosherlock_mini_process_module)
+               robosherlock-mini-process-module)
   :components
   ((:file "package")
    (:file "demo-handle" :depends-on ("package"))
