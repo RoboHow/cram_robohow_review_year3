@@ -38,27 +38,37 @@
   (apply #'call-action (reference desig)))
 
 (def-action-handler lasa-perceive (object-designator)
-  (ros-info (lasa-pm) "Perceiving dough with LASA perception")
-  (with-fields ((size area) (dough-p dough_found)
-                (object-frame object_frame) (reach-center reach_center_attractor)
-                (reach-corner reach_corner_attractor) (roll-attractor roll_attractor)
-                (back-attractor back_attractor))
-      (call-lasa-perception (get-handle))
-    (if dough-p
-        (copy-designator object-designator
-                         :new-description 
-                         `((size ,size) (object-frame ,object-frame) 
-                           (reach-center ,reach-center) (reach-corner ,reach-corner) 
-                           (roll-attractor ,roll-attractor) (back-attractor ,back-attractor)))
-        (cpl:fail 'cram-plan-failures:object-not-found))))
+  (ros-info (lasa-pm) "Perceiving dough with UIMA")
+  (let ((uima-desig (call-uima-perception object-designator)))
+    (ros-info (lasa-pm) "Perceiving dough with LASA")
+    (with-fields ((size area) (dough-p dough_found)
+                  (object-frame object_frame) (reach-center reach_center_attractor)
+                  (reach-corner reach_corner_attractor) (roll-attractor roll_attractor)
+                  (back-attractor back_attractor))
+        (call-lasa-perception (get-handle))
+      (if (and dough-p uima-desig)
+          (let ((combined-percepts
+                  (merge-desig-descriptions
+                   uima-desig
+                   `((desig-props::size ,size) 
+                     (desig-props::object-frame ,object-frame) 
+                     (desig-props::reach-center ,reach-center) 
+                     (desig-props::reach-corner ,reach-corner) 
+                     (desig-props::roll-attractor ,roll-attractor) 
+                     (desig-props::back-attractor ,back-attractor)))))
+            (copy-designator object-designator :new-description combined-percepts))
+          (cpl:fail 'cram-plan-failures:object-not-found)))))
 
 (def-action-handler lasa-control (action-desig action-type action-name 
                                                object-frame attractor-frame force-gmm)
-  (ros-info (lasa-pm) "Rolling dough with LASA controllers")
-  (format t "desig: ~a~%type: ~a~%name: ~a~%object-frame: ~a~%attractor-frame: ~a~%force-gmm: ~a~%"
-          action-desig action-type action-name object-frame attractor-frame force-gmm)
+  (ros-info (lasa-pm) "Performing ~a" action-name)
   (call-lasa-controller (get-handle) action-type action-name object-frame
-                        attractor-frame force-gmm))
+                        attractor-frame force-gmm)
+  (beliefstate:add-topic-image-to-active-node "/motion_planner/dynamics_image"))
+
+(def-action-handler home-arm (side config)
+  (ros-info (lasa-pm) "Home arm ~a to ~a" side config)
+  (boxy-pm::arm-joint-move side config))
 
 (def-fact-group lasa-process-module-action-designators (action-desig)
 
@@ -67,8 +77,19 @@
 
   (<- (some-stuff-desig? ?desig)
     (obj-desig? ?desig)
-    (desig-prop ?desig (some stuff)))
+    (desig-prop ?desig (theme ?theme))
+    (member (some stuff) ?theme)
+    (member (type dough) ?theme))
 
+  (<- (action-desig ?desig (home-arm ?side ?config))
+    (lasa-pm-running?)
+    (desig::trajectory-desig? ?desig)
+    (desig-prop ?desig (to park))
+    (desig-prop ?desig (arm right))
+    (equal ?side :right)
+    (equal ?config (1.97 -0.559 1.69 -1.188 -0.389 1.378 0.337)))
+;                  (0.252 -0.426 0.733 1.229 1.927 1.446 0.315)
+  
   (<- (action-desig ?desig (lasa-perceive ?current-desig))
     (lasa-pm-running?)
     (desig-prop ?desig (to perceive))
@@ -135,7 +156,8 @@
     (or (desig-prop ?desig (to perceive))
         (desig-prop ?desig (to reach))
         (desig-prop ?desig (to roll))
-        (desig-prop ?desig (to retract))))
+        (desig-prop ?desig (to retract))
+        (desig-prop ?desig (to park))))
 
   (<- (available-process-module lasa-process-module)
     (crs:true)))

@@ -27,11 +27,20 @@
 
 (in-package :cram-rolling-demo)
 
+(def-top-level-cram-function home ()
+  (with-designators ((park-arm (action '((type trajectory)
+                                         (to park)
+                                         (arm right)))))
+    (with-process-modules-running (lasa-process-module)
+      (plan-lib:perform park-arm))))
+
 (def-top-level-cram-function rolling-demo (max-iterations target-size)
-  (cpl-impl:with-failure-handling (((or cram-plan-failures:manipulation-failure) (e)
+  (cpl-impl:with-failure-handling (((or cpl-impl:plan-failure) (e)
                                      (declare (ignore e))
                                      (return)))
-    (with-designators ((dough (object '((some stuff)))))
+    (with-designators ((dough (object '((type tray)
+                                        (theme ((some stuff)
+                                                (type dough)))))))
       (with-process-modules-running (lasa-process-module)
         (cpl:with-retry-counters ((retry-count max-iterations))
           (cpl:with-failure-handling
@@ -58,14 +67,12 @@
     (plan-lib:perform roll-action)
     (plan-lib:perform retract-action)))
 
-;;;
-;;; NICE STARTING CONFIGURATION FOR RIGHT ARM
-;;; 0.251941055059433, -0.4262639880180359, 0.7331973910331726, 1.228747010231018, 1.926756739616394, 1.4463988542556763, 0.31512778997421265
-;;;
-
-(defun main ()
-  "Call this function from a bash-script to run the demo."
-  (roslisp-utilities:startup-ros)
+(defun perform-experiment ()
+  (setf *handle* nil)
+  (setf boxy-pm::*boxy-pm-handle* nil)
+  (boxy-pm::init-boxy-pm-handle)
+  (init-rolling-demo)
+  (sleep 2)
   (beliefstate:enable-logging t)
   (beliefstate:set-metadata 
    :robot "BOXY" 
@@ -73,9 +80,8 @@
    :experiment "Dough rolling experiment with LASA controllers for RoboHow Year3 review."
    :description "One armed dough rolling with learned GMM controllers, triggered by CRAM.")
   (rolling-demo 10 0.06)
-  (beliefstate:extract-files)
-  (roslisp-utilities:shutdown-ros))
-
+  (beliefstate:extract-files))
+  
 ;;;
 ;;; ORIGINAL LISP SCRIPT
 ;;;

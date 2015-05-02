@@ -42,7 +42,7 @@
           (actionlib-lisp:make-simple-action-client
            "plan2ctrl"
            "lasa_action_planners/PLAN2CTRLAction")))
-    (actionlib-lisp:wait-for-server lasa-controllers 2.0)
+    (actionlib-lisp:wait-for-server lasa-controllers 4.0)
     (uima::set-uima-host "/RoboSherlock_dough_detection")
     (uima::init-uima-bridge)
     (make-rolling-demo-handle
@@ -56,8 +56,18 @@
   ;; (call-persistent-service (dh-lasa-perception handle))
   )
 
-(defun call-lasa-controller (handle action-type action-name object-frame attractor-frame
-                             force-gmm-id)
+(defun call-uima-perception (object-desig)
+  (uima::trigger object-desig)
+  (prog1 (car 
+          (robosherlock-mini-pm::post-process-results
+           (uima::get-uima-result object-desig)))
+    (beliefstate:add-topic-image-to-active-node
+     "/RoboSherlock_dough_detection/output_image")))
+
+(defun call-lasa-controller (handle action-type action-name object-frame 
+                             attractor-frame force-gmm-id)
+  (boxy-pm:ensure-vel-controllers 
+   (boxy-pm:boxy-controller-manager (dh-boxy-pm handle)))
   (actionlib-lisp:send-goal-and-wait
    (dh-lasa-controllers handle)
    (actionlib-lisp:make-action-goal-msg (dh-lasa-controllers handle)

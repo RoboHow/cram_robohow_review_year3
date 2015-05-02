@@ -35,4 +35,4 @@
   (:desig-properties #:to #:perceive #:obj #:roll #:some #:stuff #:type #:trajectory
                      #:size #:object-frame #:reach-center #:reach-corner
                      #:roll-attractor #:back-attractor #:iteration
-                     #:reach #:retract))
+                     #:reach #:retract #:theme #:dough #:tray #:park #:arm #:right))
