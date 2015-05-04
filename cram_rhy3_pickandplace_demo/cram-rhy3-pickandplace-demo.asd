@@ -62,7 +62,8 @@
                designator_integration_msgs-msg
                designator_integration_msgs-srv
                cram-beliefstate
-               cram-acl)
+               cram-acl
+	       person_msgs-msg)
   :components
   ((:module "src"
             :components
