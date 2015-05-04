@@ -351,6 +351,28 @@ defaults to the topic `/object'."
 (define-hook cram-language::on-finish-speech-act
     (id))
 
+(defmacro with-kqml-sent (demo-handle sender receiver content
+                          in-reply-to &body body)
+  `(let* ((log-id (first (cram-language::on-begin-speech-act
+                          ,sender ,receiver ,content ,in-reply-to)))
+          (content (concatenate 'string "'" ,content "'"))
+          (kqml (cond (,in-reply-to
+                       (make-instance
+                        'acl:kqml-performative-tell
+                        :sender ,sender
+                        :receiver ,receiver
+                        :content content))
+                      (t
+                       (make-instance
+                        'acl:kqml-performative-tell
+                        :sender ,sender
+                        :receiver ,receiver
+                        :content content
+                        :in-reply-to ,in-reply-to)))))
+     (send-control-command ,demo-handle (acl::kqml->string kqml))
+     (progn ,@body)
+     (cram-language::on-finish-speech-act log-id)))
+
 (defun send-kqml (demo-handle sender receiver content
                               &optional in-reply-to)
   (let* ((log-id (first (cram-language::on-begin-speech-act
@@ -906,9 +928,12 @@ throughout the demo experiment."
     (labels ((message-function (msg)
                (declare (ignore msg))
                (setf message-present t)))
-      (let ((subscriber (roslisp:subscribe
-                         topic topic-type
-                         #'message-function)))
+      (let ((subscriber
+              (loop until result
+                    for result = (roslisp:subscribe
+                                  topic topic-type
+                                  #'message-function)
+                    finally (return result))))
         (sleep 1.0)
         (roslisp:unsubscribe subscriber)
         message-present))))
@@ -957,6 +982,9 @@ throughout the demo experiment."
 (defmacro ensure-manipulation (&body body)
   `(cpl:with-failure-handling
        ((cram-plan-library::manipulation-failure (f)
+          (declare (ignore f))
+          (cpl:retry))
+        (cram-moveit::control-failed (f)
           (declare (ignore f))
           (cpl:retry)))
      ,@body))
@@ -1020,7 +1048,7 @@ throughout the demo experiment."
           (when hndl
             (ensure-manipulation
               (move-handle-relative-pose
-               :right (cl-transforms:make-3d-vector -0.3 0.03 0.0) nil))
+               :right (cl-transforms:make-3d-vector -0.3 0.03 0.0) t))
             (pr2-manip-pm::open-gripper :right)
             (ensure-manipulation
               (move-handle-relative-pose
@@ -1087,43 +1115,48 @@ throughout the demo experiment."
                         ((cram-plan-failures:object-not-found (f)
                            (declare (ignore f))
                            (cpl:retry)))
-                      (pr2-manip-pm::execute-move-arm-pose
-                       :right
-                       (tf:make-pose-stamped
-                        "base_link" 0.0
-                        (tf:make-3d-vector -0.1 -0.5 1.4)
-                        (tf:euler->quaternion :az (/ pi 2)))
-                       :ignore-collisions t)
+                      (ensure-manipulation
+                        (pr2-manip-pm::execute-move-arm-pose
+                         :right
+                         (tf:make-pose-stamped
+                          "base_link" 0.0
+                          (tf:make-3d-vector -0.1 -0.5 1.4)
+                          (tf:euler->quaternion :az (/ pi 2)))
+                         :ignore-collisions t))
                       (pick-object
                        tomato-sauce :stationary t :side :left))))
                 (setf pr2-manip-pm::*raise-elbow* t)
                 (cram-language::on-with-container-open-end log-id)
-                (pr2-manip-pm::execute-move-arm-pose
-                 :right
-                 (tf:make-pose-stamped
-                  "base_link" 0.0
-                  (tf:make-3d-vector -0.1 -0.5 1.4)
-                  (tf:euler->quaternion :az (/ pi 2)))
-                 :ignore-collisions t)
+                (ensure-manipulation
+                  (pr2-manip-pm::execute-move-arm-pose
+                   :right
+                   (tf:make-pose-stamped
+                    "base_link" 0.0
+                    (tf:make-3d-vector -0.1 -0.5 1.4)
+                    (tf:euler->quaternion :az (/ pi 2)))
+                   :ignore-collisions t))
                 (go-in-front-of-fridge-4)
-                (pr2-manip-pm::execute-move-arm-pose
-                 :right
-                 (tf:make-pose-stamped
-                  "base_link" 0.0
-                  (tf:make-3d-vector -0.1 -0.8 1.4)
-                  (tf:euler->quaternion)))
-                (pr2-manip-pm::execute-move-arm-pose
-                 :right
-                 (tf:make-pose-stamped
-                  "base_link" 0.0
-                  (tf:make-3d-vector 0.1 -0.8 1.2)
-                  (tf:euler->quaternion)))
-                (pr2-manip-pm::execute-move-arm-pose
-                 :right
-                 (tf:make-pose-stamped
-                  "base_link" 0.0
-                  (tf:make-3d-vector 0.3 0.0 1.2)
-                  (tf:euler->quaternion)))
+                (ensure-manipulation
+                  (pr2-manip-pm::execute-move-arm-pose
+                   :right
+                   (tf:make-pose-stamped
+                    "base_link" 0.0
+                    (tf:make-3d-vector -0.1 -0.8 1.4)
+                    (tf:euler->quaternion))))
+                (ensure-manipulation
+                  (pr2-manip-pm::execute-move-arm-pose
+                   :right
+                   (tf:make-pose-stamped
+                    "base_link" 0.0
+                    (tf:make-3d-vector 0.1 -0.8 1.2)
+                    (tf:euler->quaternion))))
+                (ensure-manipulation
+                  (pr2-manip-pm::execute-move-arm-pose
+                   :right
+                   (tf:make-pose-stamped
+                    "base_link" 0.0
+                    (tf:make-3d-vector 0.3 0.0 1.2)
+                    (tf:euler->quaternion))))
                 tomato-sauce))))))))
 
 (defun put-tomato-sauce-on-table (demo-handle tomato-sauce)
@@ -1212,6 +1245,7 @@ throughout the demo experiment."
                           "drawer_sinkblock_upper_handle"))))
             ;; Grasp object here.
             (look-into-drawer)
+            (sleep 4)
             (let ((spoon (ensure-results (perceive-spoon demo-handle))))
               (unwind-protect
                    (progn
@@ -1388,7 +1422,7 @@ throughout the demo experiment."
    :left (tf:make-3d-vector 0.0 0.1 0.0))
   (pr2-manip-pm::open-gripper :right)
   (pr2-single-arm-linear-relative-movement
-   :left (tf:make-3d-vector 0.0 -0.1 0.0))
+   :right (tf:make-3d-vector 0.0 -0.1 0.0))
   (ensure-arms-up))
 
   ;; (pr2-dual-arm-linear-relative-movement

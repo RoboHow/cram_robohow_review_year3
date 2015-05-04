@@ -40,23 +40,43 @@
 ;; backend to make the two robots wait for each other, i.e., respect
 ;; the current `phase' of the demo.
 
-;; NOTE(winkler): Two top level plans, one for each robot. @georg, is
-;; this feasible for you?
 (def-top-level-cram-function pizza-making-pr2 ()
   (with-process-modules-pr2
     (let ((dh (get-demo-handle)))
       (initialize-demo-setup dh :pr2 :enable-logging t)
-      ;; TODO(all): Perform actual PR2 demo plans here
-      ;; Do everything pizza-making related here before moving the tray
-      ;(fetch-spoon dh)
-      ;(fetch-tomato-sauce dh)
-      (fetch-tray dh)
-      (tray-into-oven dh)
-      ;(close-oven dh)
-      ;;(shove-tray-into-oven dh)
-      ;;(close-oven dh)
-      ;;(send-kqml dh "PR2" "Boxy" "tray placed in oven")
+      (select-rs-instance "handles")
+      (with-kqml-sent dh "PR2" "*" "fetching spoon" nil
+        (fetch-spoon dh))
+      (with-kqml-sent dh "PR2" "*" "fetching tomato sauce" nil
+        (fetch-tomato-sauce dh))
+      (select-rs-instance "tray")
+      (with-kqml-sent dh "PR2" "*" "fetching tray" nil
+        (fetch-tray dh))
+      (with-kqml-sent dh "PR2" "*" "bringing tray to oven" nil
+        (tray-into-oven dh))
+      (send-kqml dh "PR2" "Boxy" "tray placed on oven lid")
+      (go-in-front-of-fridge)
+      (human-perception dh)
       (destroy-demo-handle dh))))
+
+(def-cram-function human-perception (demo-handle)
+  (let ((log-id (beliefstate:start-node "WAITING-FOR-HUMAN")))
+    (with-kqml-sent
+        demo-handle
+        "Boxy" "PR2"
+        "i am waiting for a human to put the tray into the oven" nil
+      (wait-for-human-in-scene demo-handle))
+    (beliefstate:stop-node log-id))
+  (let ((log-id (beliefstate:start-node "SEEING-HUMAN")))
+    (with-kqml-sent demo-handle "Boxy" "PR2"
+        "a human entered the scene" nil
+      (wait-while-human-in-scene demo-handle))
+    (beliefstate:stop-node log-id))
+  (let ((log-id (beliefstate:start-node "WITH-HUMAN-LEFT")))
+    (with-kqml-sent demo-handle "Boxy" "PR2"
+        "the human left the scene again" nil
+      (sleep 5))
+    (beliefstate:stop-node log-id)))
 
 (def-top-level-cram-function pizza-making-boxy ()
   (with-process-modules-boxy

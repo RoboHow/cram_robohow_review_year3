@@ -130,8 +130,8 @@
     (symbol-value pi ?pi)
     (crs:lisp-fun / ?pi 4 ?tilt1)
     (crs:lisp-fun * ?tilt1 5 ?tilt2)
-    (crs:lisp-fun - ?tilt2 0.0 ?tilt3)
-    (make-handles 0.185 2 0 desig-props:push ?pi ?tilt3
+    (crs:lisp-fun * ?pi -1 ?minus-pi)
+    (make-handles 0.185 2 0 desig-props:push ?minus-pi ?tilt2
                   0.0 0.0 0.0 0.0 ?handles-list))
   
   (<- (object-handle desig-props:tomato-sauce ?handles-list)
