@@ -44,6 +44,7 @@
   (with-process-modules-pr2
     (let ((dh (get-demo-handle)))
       (initialize-demo-setup dh :pr2 :enable-logging t)
+      (wait-for-external-trigger :force t)
       (select-rs-instance "handles")
       (with-kqml-sent dh "PR2" "*" "fetching spoon" nil
         (fetch-spoon dh))
