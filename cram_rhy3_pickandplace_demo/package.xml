@@ -46,7 +46,9 @@
   <build_depend>semantic_map_costmap</build_depend>
   <build_depend>cram_acl</build_depend>
   <build_depend>cl_tf2</build_depend>
+  <build_depend>person_msgs</build_depend>
   
+  <run_depend>person_msgs</run_depend>
   <run_depend>alexandria</run_depend>
   <run_depend>bullet_reasoning</run_depend>
   <run_depend>bullet_reasoning_designators</run_depend>
