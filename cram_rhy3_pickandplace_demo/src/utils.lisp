@@ -1267,8 +1267,12 @@ throughout the demo experiment."
               (unwind-protect
                    (progn
                      (setf pr2-manip-pm::*allowed-arms* `(:left))
-                     (ensure-manipulation
-                       (pick-object spoon :stationary t :side :left)))
+                     (cpl:with-failure-handling
+                         ((cram-plan-failures:object-not-found (f)
+                            (declare (ignore f))
+                            (cpl:retry)))
+                       (ensure-manipulation
+                         (pick-object spoon :stationary t :side :left))))
                 (setf pr2-manip-pm::*allowed-arms* `(:left :right)))
               (ensure-manipulation
                 (move-arm-relative-pose
