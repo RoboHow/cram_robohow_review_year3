@@ -49,6 +49,7 @@
         (fetch-spoon dh))
       (with-kqml-sent dh "PR2" "*" "fetching tomato sauce" nil
         (fetch-tomato-sauce dh))
+      (wait-for-external-trigger :force t)
       (select-rs-instance "tray")
       (with-kqml-sent dh "PR2" "*" "fetching tray" nil
         (fetch-tray dh))

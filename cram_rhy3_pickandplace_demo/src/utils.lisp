@@ -47,6 +47,23 @@
 ;;; Helper functions
 ;;;
 
+(defparameter *wait-for-trigger* nil)
+
+(defun wait-for-external-trigger (&key force)
+  (when (or *wait-for-trigger* force)
+    (roslisp:ros-info
+     (demo-control) "Waiting for external trigger to continue.")
+    (let* ((waiter-fluent (cpl:make-fluent))
+           (subscriber (roslisp:subscribe
+                        "/waiter_fluent"
+                        "std_msgs/Empty"
+                        (lambda (msg)
+                          (declare (ignore msg))
+                          (cpl:setf (cpl:value waiter-fluent) t)))))
+      (loop until (cpl:value waiter-fluent) do (sleep 0.1))
+      (roslisp:unsubscribe subscriber))
+    (roslisp:ros-info (demo-control) "External trigger arrived.")))
+
 (defun get-demo-handle ()
   (let ((cc-fluent (cpl:make-fluent :name "control-command"
                                     :allow-tracing nil)))
