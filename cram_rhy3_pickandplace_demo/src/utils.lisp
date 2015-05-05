@@ -1181,7 +1181,7 @@ throughout the demo experiment."
   (let* ((target-pose
            (tf:make-pose-stamped
             "map" 0.0
-            (tf:make-3d-vector 1.3 1.0 0.95)
+            (tf:make-3d-vector 1.35 1.0 0.95)
             (tf:euler->quaternion)))
          (loc (make-designator
                'location `((desig-props:pose
@@ -1246,11 +1246,11 @@ throughout the demo experiment."
                        (perform action)))))
           (ensure-manipulation
             (move-handle-relative-pose
-             :right (cl-transforms:make-3d-vector -0.4 -0.2 0.02) t))
+             :right (cl-transforms:make-3d-vector -0.35 -0.2 0.02) t))
           (pr2-manip-pm::open-gripper :right)
           (ensure-manipulation
             (move-arm-relative-pose
-             :right (cl-transforms:make-3d-vector 0.2 0.0 0.0) t))
+             :right (cl-transforms:make-3d-vector 0.23 0.0 0.0) t))
           (pr2-manip-pm::close-gripper :right)
           (ensure-manipulation
             (move-arm-relative-pose
