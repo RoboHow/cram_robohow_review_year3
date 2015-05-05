@@ -40,25 +40,34 @@
 ;; backend to make the two robots wait for each other, i.e., respect
 ;; the current `phase' of the demo.
 
-(def-top-level-cram-function pizza-making-pr2 ()
+(def-top-level-cram-function pizza-making-pr2 (&key (human-tracking t)
+                                                    (spoon t)
+                                                    (tray t)
+                                                    (ketchup t))
   (with-process-modules-pr2
     (let ((dh (get-demo-handle)))
       (initialize-demo-setup dh :pr2 :enable-logging t)
+      (ensure-arms-up)
       (wait-for-external-trigger :force t)
       (select-rs-instance "handles")
-      (with-kqml-sent dh "PR2" "*" "fetching spoon" nil
-        (fetch-spoon dh))
-      (with-kqml-sent dh "PR2" "*" "fetching tomato sauce" nil
-        (fetch-tomato-sauce dh))
+      (when spoon
+        (with-kqml-sent dh "PR2" "*" "fetching spoon" nil
+          (fetch-spoon dh)))
+      (when ketchup
+        (with-kqml-sent dh "PR2" "*" "fetching tomato sauce" nil
+          (fetch-tomato-sauce dh)))
       (wait-for-external-trigger :force t)
-      (select-rs-instance "tray")
-      (with-kqml-sent dh "PR2" "*" "fetching tray" nil
-        (fetch-tray dh))
-      (with-kqml-sent dh "PR2" "*" "bringing tray to oven" nil
-        (tray-into-oven dh))
-      (send-kqml dh "PR2" "Boxy" "tray placed on oven lid")
-      (go-in-front-of-fridge)
-      (human-perception dh)
+      (when tray
+        (select-rs-instance "tray")
+        (with-kqml-sent dh "PR2" "*" "fetching tray" nil
+          (fetch-tray dh))
+        (with-kqml-sent dh "PR2" "*" "bringing tray to oven" nil
+          (tray-into-oven dh))
+        (send-kqml dh "PR2" "Boxy" "tray placed on oven lid"))
+      (when human-tracking
+        (go-in-front-of-island-2)
+        (go-in-front-of-fridge)
+        (human-perception dh))
       (destroy-demo-handle dh))))
 
 (def-cram-function human-perception (demo-handle)
@@ -151,7 +160,7 @@
              (cl-transforms:make-3d-vector -0.354 1.4 0.0)
              (cl-transforms:make-quaternion 0 0 1 0))))
          (desig-props:in-front-of desig-props:island)))
-      nil)
+      t)
   (look-onto-island)
   (let ((tray (ensure-results (perceive-tray demo-handle))))
     (try-forever
