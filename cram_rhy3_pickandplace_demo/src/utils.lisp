@@ -1176,8 +1176,36 @@ throughout the demo experiment."
                     (tf:euler->quaternion))))
                 tomato-sauce))))))))
 
+(defun back-off (&optional (distance 0.3))
+  (labels ((move-base-relative-pose (vector)
+             (let* ((base-id
+                      (cl-tf2:ensure-pose-stamped-transformed
+                       *tf2*
+                       (cl-tf:pose->pose-stamped
+                        "base_footprint" 0.0
+                        (cl-transforms:make-identity-pose))
+                       "map"))
+                    (base-translated
+                      (cl-tf:copy-pose-stamped
+                       base-id
+                       :origin (cl-tf:v+ (cl-tf:origin base-id)
+                                         vector))))
+               (let ((action (make-designator
+                              'action `((desig-props:type
+                                         desig-props:navigation)
+                                        (desig-props:goal
+                                         ,(make-designator
+                                           'location
+                                           `((desig-props:pose
+                                              ,base-translated))))))))
+                 (perform action)))))
+    (move-base-relative-pose (tf:make-3d-vector
+                              (- 0 distance) 0.0 0.0))))
+
+
 (defun put-tomato-sauce-on-table (demo-handle tomato-sauce)
   (declare (ignore demo-handle))
+  (back-off)
   (let* ((target-pose
            (tf:make-pose-stamped
             "map" 0.0
@@ -1304,17 +1332,8 @@ throughout the demo experiment."
         'location
         `((desig-props::pose
            ,spoon-putdown-pose)))
-       :stationary t))))
-    ;; (in-front-of-island demo-handle
-    ;;   (ensure-manipulation
-    ;;     (place-object
-    ;;      spoon
-    ;;      (make-designator
-    ;;       'location
-    ;;       `((desig-props::pose ,spoon-putdown-pose)))
-    ;;       ;; `((desig-props:on Cupboard)
-    ;;       ;;   (desig-props:name "kitchen_island")))
-    ;;      :stationary t)))))
+       :stationary t)))
+  (back-off))
 
 (defun test-spoon-putdown-pose ()
   (let ((spoon-putdown-pose

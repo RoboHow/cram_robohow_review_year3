@@ -56,8 +56,8 @@
       (when ketchup
         (with-kqml-sent dh "PR2" "*" "fetching tomato sauce" nil
           (fetch-tomato-sauce dh)))
-      (wait-for-external-trigger :force t)
       (when tray
+        (wait-for-external-trigger :force t)
         (select-rs-instance "tray")
         (with-kqml-sent dh "PR2" "*" "fetching tray" nil
           (fetch-tray dh))
@@ -65,6 +65,8 @@
           (tray-into-oven dh))
         (send-kqml dh "PR2" "Boxy" "tray placed on oven lid"))
       (when human-tracking
+        (wait-for-external-trigger :force t)
+        (back-off)
         (go-in-front-of-island-2)
         (go-in-front-of-fridge)
         (human-perception dh))
